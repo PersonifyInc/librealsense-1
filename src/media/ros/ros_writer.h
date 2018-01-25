@@ -6,7 +6,6 @@
 #include <string>
 #include <memory>
 #include <iomanip>
-#include <ios>      //For std::hexfloat
 #include "core/debug.h"
 #include "core/serialization.h"
 #include "archive.h"
@@ -297,7 +296,7 @@ namespace librealsense
             //Write frame's timestamp as metadata
             diagnostic_msgs::KeyValue frame_timestamp_msg;
             frame_timestamp_msg.key = FRAME_TIMESTAMP_MD_STR;
-            frame_timestamp_msg.value = to_string() << std::hexfloat << pose->get_frame_timestamp();
+            frame_timestamp_msg.value = to_string() << pose->get_frame_timestamp();
             write_message(md_topic, timestamp, frame_timestamp_msg);
             
             // Write the rest of the frame metadata and stream extrinsics
