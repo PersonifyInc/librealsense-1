@@ -5,7 +5,6 @@
 #include <chrono>
 #include <mutex>
 #include <regex>
-#include <ios>      //For std::hexfloat
 #include <core/serialization.h>
 #include "rosbag/view.h"
 #include "ros_file_format.h"
@@ -632,7 +631,7 @@ namespace librealsense
                     {
                         double ts;
                         std::istringstream iss(kvp.second);
-                        iss >> std::hexfloat >> ts;
+                        iss >> ts;
                         timestamp_ms = std::chrono::duration<double, std::milli>(ts);
                     }
                     else if (kvp.first == TRACKER_CONFIDENCE_MD_STR)
