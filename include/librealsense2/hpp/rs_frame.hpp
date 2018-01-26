@@ -328,7 +328,7 @@ namespace rs2
         * Change the internal frame handle to the one in parameter, then put the other frame internal frame handle to nullptr
         * \param[in] frame other - another frame instance to be pointed to
         */
-        frame(frame&& other) noexcept : frame_ref(other.frame_ref)
+        frame(frame&& other) : frame_ref(other.frame_ref)
         {
             other.frame_ref = nullptr;
 #ifdef _DEBUG
