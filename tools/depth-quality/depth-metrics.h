@@ -136,7 +136,7 @@ namespace rs2
             const auto w = frame.get_width();
             const auto h = frame.get_height();
 
-            snapshot_metrics result{ w, h, roi, {} };
+            snapshot_metrics result{ w, h, roi};
 
             std::mutex m;
 

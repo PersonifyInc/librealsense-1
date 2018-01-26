@@ -19,6 +19,10 @@ endif()
 
 set(DEPENDENCIES realsense2)
 
+if(UNIX)
+    list(APPEND DEPENDENCIES pthread)
+endif()
+
 add_executable(live-test unit-tests-live.cpp unit-tests-main.cpp unit-tests-common.h)
 target_link_libraries(live-test ${DEPENDENCIES})
 
