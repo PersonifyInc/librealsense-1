@@ -19,6 +19,10 @@ endif()
 
 set(DEPENDENCIES realsense2)
 
+if(UNIX)
+    list(APPEND DEPENDENCIES pthread)
+endif()
+
 set (unit_tests_sources
     unit-tests-live.cpp
     unit-tests-post-processing.cpp
