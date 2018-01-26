@@ -19,15 +19,12 @@ endif()
 
 set(DEPENDENCIES realsense2)
 
-set (unit_tests_sources
-    unit-tests-live.cpp
-    unit-tests-post-processing.cpp
-    unit-tests-post-processing.h
-    unit-tests-main.cpp
-    unit-tests-common.h
-)
+if(UNIX)
+    list(APPEND DEPENDENCIES pthread)
+endif()
 
-add_executable(live-test ${unit_tests_sources})
+add_executable(live-test unit-tests-live.cpp unit-tests-post-processing.cpp unit-tests-post-processing.h unit-tests-main.cpp unit-tests-common.h)
+
 target_link_libraries(live-test ${DEPENDENCIES})
 
 set_target_properties (live-test PROPERTIES
@@ -38,7 +35,7 @@ install(
     TARGETS
 
     live-test
-	
+
     RUNTIME DESTINATION
     ${CMAKE_INSTALL_PREFIX}/bin
 )
