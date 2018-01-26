@@ -224,7 +224,7 @@ namespace rs2
 #endif
         }
 
-        frame(frame&& other) noexcept : frame_ref(other.frame_ref)
+        frame(frame&& other) : frame_ref(other.frame_ref)
         {
             other.frame_ref = nullptr;
 #ifdef _DEBUG

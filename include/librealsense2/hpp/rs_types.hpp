@@ -107,7 +107,7 @@ namespace rs2
     class name : public base\
     {\
     public:\
-        explicit name(rs2_error* e) noexcept : base(e) {}\
+        explicit name(rs2_error* e) : base(e) {}\
     }
 
     RS2_ERROR_CLASS(recoverable_error, error);
