@@ -79,4 +79,3 @@ add_subdirectory(realsense-viewer)
 add_subdirectory(data-collect)
 add_subdirectory(depth-quality)
 add_subdirectory(rosbag_inspector)
-

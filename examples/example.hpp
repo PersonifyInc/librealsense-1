@@ -142,6 +142,8 @@ public:
     {
         glfwInit();
         win = glfwCreateWindow(width, height, title, nullptr, nullptr);
+        if (!win)
+            throw std::runtime_error("Could not open OpenGL window, please check your graphic drivers or use the textual SDK tools");
         glfwMakeContextCurrent(win);
 
         glfwSetWindowUserPointer(win, this);
@@ -219,15 +221,15 @@ struct glfw_state {
     double pitch;
     double last_x;
     double last_y;
-    bool ml; 
+    bool ml;
     float offset_x;
-    float offset_y; 
+    float offset_y;
     texture tex;
 };
 
 
 // Handles all the OpenGL calls needed to display the point cloud
-void draw_pointcloud(window& app, glfw_state& app_state, rs2::points& points)
+void draw_pointcloud(float width, float height, glfw_state& app_state, rs2::points& points)
 {
     if (!points)
         return;
@@ -235,8 +237,6 @@ void draw_pointcloud(window& app, glfw_state& app_state, rs2::points& points)
     // OpenGL commands that prep screen for the pointcloud
     glPopMatrix();
     glPushAttrib(GL_ALL_ATTRIB_BITS);
-
-    float width = app.width(), height = app.height();
 
     glClearColor(153.f / 255, 153.f / 255, 153.f / 255, 1);
     glClear(GL_DEPTH_BUFFER_BIT);

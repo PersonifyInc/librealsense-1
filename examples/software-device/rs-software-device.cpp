@@ -3,7 +3,7 @@
 
 #include <librealsense2/rs.hpp> // Include RealSense Cross Platform API
 #include <librealsense2/hpp/rs_internal.hpp>
-#include "example.hpp" 
+#include "example.hpp"
 #include "example.hpp"          // Include short list of convenience functions for rendering
 
 
@@ -70,7 +70,7 @@ public:
         if (now - last > std::chrono::milliseconds(1))
         {
             app_state.yaw -= 1;
-            wave_base += 0.1;
+            wave_base += 0.1f;
             last = now;
 
             for (int i = 0; i < depth_frame.y; i++)
@@ -119,11 +119,11 @@ int main(int argc, char * argv[]) try
     glfw_state app_state;
     register_glfw_callbacks(app, app_state);
     rs2::colorizer color_map; // Save colorized depth for preview
-   
+
     rs2::pointcloud pc;
     rs2::points points;
     int frame_number = 0;
-    
+
     custom_frame_source app_data;
 
     auto texture = app_data.get_synthetic_texture();
@@ -137,8 +137,8 @@ int main(int argc, char * argv[]) try
 
     rs2::software_device dev; // Create software-only device
 
-    auto depth_sensor = dev.add_sensor("Depth"); // Define single sensor 
-    auto color_sensor = dev.add_sensor("Color"); // Define single sensor 
+    auto depth_sensor = dev.add_sensor("Depth"); // Define single sensor
+    auto color_sensor = dev.add_sensor("Color"); // Define single sensor
 
     auto depth_stream = depth_sensor.add_video_stream({  RS2_STREAM_DEPTH, 0, 0,
                                 W, H, 60, BPP,
@@ -148,11 +148,14 @@ int main(int argc, char * argv[]) try
 
 
     auto color_stream = color_sensor.add_video_stream({  RS2_STREAM_COLOR, 0, 1, texture.x,
-                                texture.y, 60, texture.bpp, 
+                                texture.y, 60, texture.bpp,
                                 RS2_FORMAT_RGBA8, color_intrinsics });
 
     dev.create_matcher(RS2_MATCHER_DLR_C);
     rs2::syncer sync;
+
+    depth_sensor.open(depth_stream);
+    color_sensor.open(color_stream);
 
     depth_sensor.start(sync);
     color_sensor.start(sync);
@@ -161,7 +164,7 @@ int main(int argc, char * argv[]) try
 
     while (app) // Application still alive?
     {
-        synthetic_frame depth_frame = app_data.get_synthetic_depth(app_state);
+        synthetic_frame& depth_frame = app_data.get_synthetic_depth(app_state);
 
         depth_sensor.on_video_frame({ depth_frame.frame.data(), // Frame pixels from capture API
             [](void*) {}, // Custom deleter (if required)
@@ -191,7 +194,7 @@ int main(int argc, char * argv[]) try
             // Upload the color frame to OpenGL
             app_state.tex.upload(color);
         }
-        draw_pointcloud(app, app_state, points);
+        draw_pointcloud(app.width(), app.height(), app_state, points);
     }
 
     return EXIT_SUCCESS;

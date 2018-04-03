@@ -170,18 +170,42 @@ namespace librealsense
             uint8_t         metadata_size;
             const void *    pixels;
             const void *    metadata;
+            rs2_time_t      backend_time;
+
         };
 
         typedef std::function<void(stream_profile, frame_object, std::function<void()>)> frame_callback;
 
+        // Binary-coded decimal represent the USB specification to which the UVC device complies
+        enum usb_spec : uint16_t {
+            usb_undefined   = 0,
+            usb1_type       = 0x0100,
+            usb1_1_type     = 0x0110,
+            usb2_type       = 0x0200,
+            usb2_1_type     = 0x0210,
+            usb3_type       = 0x0300,
+            usb3_1_type     = 0x0310
+        };
+
+        static const std::map<usb_spec, std::string> usb_spec_names = {
+                { usb_undefined,"Undefined" },
+                { usb1_type,    "1.0" },
+                { usb1_1_type,  "1.1" },
+                { usb2_type,    "2.0" },
+                { usb2_1_type,  "2.1" },
+                { usb3_type,    "3.0" },
+                { usb3_1_type,  "3.1" }
+        };
+
         struct uvc_device_info
         {
             std::string id = ""; // to distinguish between different pins of the same device
-            uint16_t vid;
-            uint16_t pid;
-            uint16_t mi;
-            std::string unique_id;
-            std::string device_path;
+            uint16_t vid = 0;
+            uint16_t pid = 0;
+            uint16_t mi = 0;
+            std::string unique_id = "";
+            std::string device_path = "";
+            usb_spec conn_spec = usb_undefined;
 
             operator std::string()
             {
@@ -191,7 +215,8 @@ namespace librealsense
                     "\npid- " << std::hex << pid <<
                     "\nmi- " << mi <<
                     "\nunique_id- " << unique_id <<
-                    "\npath- " << device_path;
+                    "\npath- " << device_path <<
+                    "\nsusb specification- " << std::hex << (uint16_t)conn_spec << std::dec;
 
                 return s.str();
             }
@@ -210,7 +235,8 @@ namespace librealsense
                    (a.mi == b.mi) &&
                    (a.unique_id == b.unique_id) &&
                    (a.id == b.id) &&
-                   (a.device_path == b.device_path);
+                   (a.device_path == b.device_path) &&
+                   (a.conn_spec == b.conn_spec);
         }
 
         struct usb_device_info
@@ -221,6 +247,7 @@ namespace librealsense
             uint16_t pid;
             uint16_t mi;
             std::string unique_id;
+            usb_spec conn_spec;
 
             operator std::string()
             {
@@ -229,7 +256,8 @@ namespace librealsense
                 s << "vid- " << std::hex << vid <<
                     "\npid- " << std::hex << pid <<
                     "\nmi- " << mi <<
-                    "\nunique_id- " << unique_id;
+                    "\nsusb specification- " << std::hex << (uint16_t)conn_spec << std::dec <<
+                     "\nunique_id- " << unique_id;
 
                 return s.str();
             }
@@ -242,7 +270,8 @@ namespace librealsense
                 (a.vid == b.vid) &&
                 (a.pid == b.pid) &&
                 (a.mi == b.mi) &&
-                (a.unique_id == b.unique_id);
+                (a.unique_id == b.unique_id) &&
+                (a.conn_spec == b.conn_spec);
         }
 
         struct hid_device_info
@@ -377,9 +406,6 @@ namespace librealsense
                                                                 custom_sensor_report_field report_field) = 0;
         };
 
-
-
-
         struct request_mapping;
 
         class uvc_device
@@ -409,7 +435,7 @@ namespace librealsense
             virtual void unlock() const = 0;
 
             virtual std::string get_device_location() const = 0;
-
+            virtual usb_spec  get_usb_specification() const = 0;
 
             virtual ~uvc_device() = default;
 
@@ -531,6 +557,11 @@ namespace librealsense
                 return _dev->get_device_location();
             }
 
+            usb_spec get_usb_specification() const override
+            {
+                return _dev->get_usb_specification();
+            }
+
             void lock() const override { _dev->lock(); }
             void unlock() const override { _dev->unlock(); }
 
@@ -573,7 +604,7 @@ namespace librealsense
             {
                 return !list_changed(uvc_devices, other.uvc_devices) &&
                     !list_changed(hid_devices, other.hid_devices) &&
-                    !list_changed(playback_devices, other.playback_devices) && 
+                    !list_changed(playback_devices, other.playback_devices) &&
                     !list_changed(tm2_devices, other.tm2_devices);
             }
 
@@ -789,6 +820,11 @@ namespace librealsense
                 return _dev.front()->get_device_location();
             }
 
+            usb_spec get_usb_specification() const override
+            {
+                return _dev.front()->get_usb_specification();
+            }
+
             void lock() const override
             {
                 std::vector<uvc_device*> locked_dev;
@@ -850,6 +886,8 @@ namespace librealsense
             virtual ~device_watcher() {};
         };
     }
+
+    double monotonic_to_realtime(double monotonic);
 }
 
 #endif

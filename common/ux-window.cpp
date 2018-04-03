@@ -45,6 +45,9 @@ namespace rs2
         // Create GUI Windows
         _win = glfwCreateWindow(_width, _height, _title_str.c_str(),
             (_fullscreen ? primary : nullptr), nullptr);
+        if (!_win) 
+            throw std::runtime_error("Could not open OpenGL window, please check your graphic drivers or use the textual SDK tools");
+
         glfwMakeContextCurrent(_win);
         ImGui_ImplGlfw_Init(_win, true);
 
@@ -69,8 +72,8 @@ namespace rs2
         glfwSetScrollCallback(_win, [](GLFWwindow * w, double xoffset, double yoffset)
         {
             auto data = reinterpret_cast<ux_window*>(glfwGetWindowUserPointer(w));
-            data->_mouse.mouse_wheel = yoffset;
-            data->_mouse.ui_wheel += yoffset;
+            data->_mouse.mouse_wheel = static_cast<int>(yoffset);
+            data->_mouse.ui_wheel += static_cast<int>(yoffset);
         });
 
         glfwSetDropCallback(_win, [](GLFWwindow* w, int count, const char** paths)
@@ -291,9 +294,9 @@ namespace rs2
 
         // Update the scale factor each frame
         // based on resolution and physical display size
-        _scale_factor = pick_scale_factor(_win);
-        _width = _width / _scale_factor;
-        _height = _height / _scale_factor;
+        _scale_factor = static_cast<float>(pick_scale_factor(_win));
+        _width = static_cast<int>(_width / _scale_factor);
+        _height = static_cast<int>(_height / _scale_factor);
 
         if (w != _width || h != _height)
         {

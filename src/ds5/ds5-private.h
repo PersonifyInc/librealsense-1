@@ -3,14 +3,12 @@
 
 #pragma once
 
-//#include "metadata.h"
 #include "backend.h"
 #include "types.h"
 
 #include <map>
 #include <iomanip>
 
-const double TIMESTAMP_USEC_TO_MSEC = 0.001;
 
 namespace librealsense
 {
@@ -60,20 +58,20 @@ namespace librealsense
         };
 
         static const std::map<std::uint16_t, std::string> rs400_sku_names = {
-            { RS400_PID,    "Intel RealSense 400"},
-            { RS400_MM_PID, "Intel RealSense 400 with Tracking Module"},
-            { RS410_PID,    "Intel RealSense 410"},
-            { RS410_MM_PID, "Intel RealSense 410 with Tracking Module"},
-            { RS415_PID,    "Intel RealSense 415"},
-            { RS420_PID,    "Intel RealSense 420"},
-            { RS420_MM_PID, "Intel RealSense 420 with Tracking Module"},
-            { RS430_PID,    "Intel RealSense 430"},
-            { RS430_MM_PID, "Intel RealSense 430 with Tracking Module"},
-            { RS430_MM_PID, "Intel RealSense 430 with Tracking Module and RGB Module"},
-            { RS435_RGB_PID,"Intel RealSense 435"},
-            { RS460_PID,    "Intel RealSense 460" },
-            { RS405_PID,    "Intel RealSense 405" },
-            { RS_USB2_PID,  "Intel RealSense USB2" }
+            { RS400_PID,        "Intel RealSense D400"},
+            { RS400_MM_PID,     "Intel RealSense D400 with Tracking Module"},
+            { RS410_PID,        "Intel RealSense D410"},
+            { RS410_MM_PID,     "Intel RealSense D410 with Tracking Module"},
+            { RS415_PID,        "Intel RealSense D415"},
+            { RS420_PID,        "Intel RealSense D420"},
+            { RS420_MM_PID,     "Intel RealSense D420 with Tracking Module"},
+            { RS430_PID,        "Intel RealSense D430"},
+            { RS430_MM_PID,     "Intel RealSense D430 with Tracking Module"},
+            { RS430_MM_PID,     "Intel RealSense D430 with Tracking Module and RGB Module"},
+            { RS435_RGB_PID,    "Intel RealSense D435"},
+            { RS460_PID,        "Intel RealSense D460" },
+            { RS405_PID,        "Intel RealSense D405" },
+            { RS_USB2_PID,      "Intel RealSense USB2" }
         };
 
         // DS5 fisheye XU identifiers
@@ -183,14 +181,6 @@ namespace librealsense
 
 #pragma pack(push, 1)
 
-        struct fisheye_intrinsics_table
-        {
-            table_header        header;
-            float               intrinsics_model;           //  1 - Brown, 2 - FOV, 3 - Kannala Brandt
-            float3x3            intrinsic;                  //  fisheye intrinsic data, normalized
-            float               distortion[5];
-        };
-
         struct fisheye_extrinsics_table
         {
             table_header        header;
@@ -205,6 +195,89 @@ namespace librealsense
             float3x3            rotation;
             float3              translation;
         };
+
+        struct imu_intrinsics
+        {
+            float bias[3];
+            float scale[3];
+        };
+
+        struct fisheye_calibration_table
+        {
+            table_header        header;
+            float               intrinsics_model;           //  1 - Brown, 2 - FOV, 3 - Kannala Brandt
+            float3x3            intrinsic;                  //  FishEye intrinsic matrix, normalize by [-1 1]
+            float               distortion[5];              //  FishEye forward distortion parameters, F-theta model
+            extrinsics_table    fisheye_to_imu;             //  FishEye rotation matrix and translation vector in IMU CS
+            uint8_t             reserved[28];
+        };
+
+        constexpr size_t fisheye_calibration_table_size = sizeof(fisheye_calibration_table);
+
+        struct imu_calibration_table
+        {
+            table_header        header;
+            float               rmax;
+            extrinsics_table    imu_to_imu;
+            imu_intrinsics      accel_intrinsics;
+            imu_intrinsics      gyro_intrinsics;
+            uint8_t             reserved[64];
+        };
+
+        constexpr size_t imu_calibration_table_size = sizeof(imu_calibration_table);
+
+        struct tm1_module_info
+        {
+            table_header        header;
+            uint8_t             serial_num[8];              // 2 bytes reserved + 6 data (0000xxxxxxxxxxxx)
+            uint8_t             optic_module_mm[4];
+            uint8_t             ta[10];
+            uint32_t            board_num;                  // SKU id
+            uint32_t            board_rev;                  // 0
+            uint8_t             reserved[34];               // Align to 64 byte ??? 
+        };
+
+        constexpr size_t tm1_module_info_size = sizeof(tm1_module_info);
+
+        struct tm1_calib_model
+        {
+            table_header                header;
+            float                       calibration_model_flag;     //  1 - Brown, 2 - FOV, 3 - Kannala Brandt ???????
+            fisheye_calibration_table   fe_calibration;
+            float                       temperature;
+            uint8_t                     reserved[20];
+        };
+
+        constexpr size_t tm1_calib_model_size = sizeof(tm1_calib_model);
+
+        struct tm1_serial_num_table
+        {
+            table_header                header;
+            uint8_t                     serial_num[8];              // 2 bytes reserved + 6 data  12 digits in (0000xxxxxxxxxxxx) format
+            uint8_t                     reserved[8];
+        };
+
+        constexpr size_t tm1_serial_num_table_size = sizeof(tm1_serial_num_table);
+
+        struct tm1_calibration_table
+        {
+            table_header                header;
+            tm1_calib_model             calib_model;
+            imu_calibration_table       imu_calib_table;
+            tm1_serial_num_table        serial_num_table;
+        };
+
+        constexpr size_t tm1_calibration_table_size = sizeof(tm1_calibration_table);
+
+        // TM1 ver 0.51
+        struct tm1_eeprom
+        {
+            table_header            header;
+            tm1_module_info         module_info;
+            tm1_calibration_table   calibration_table;
+        };
+
+        constexpr size_t tm1_eeprom_size = sizeof(tm1_eeprom);
 
         struct depth_table_control
         {
@@ -235,11 +308,6 @@ namespace librealsense
             float               reserved[24];
         };
 
-        struct imu_intrinsics
-        {
-            float bias[3];
-            float scale[3];
-        };
 
         inline rs2_motion_device_intrinsic create_motion_intrinsics(imu_intrinsics data)
         {
@@ -253,15 +321,7 @@ namespace librealsense
             return result;
         }
 
-        struct imu_calibration_table
-        {
-            table_header        header;
-            float               rmax;
-            extrinsics_table    imu_to_fisheye;
-            imu_intrinsics      accel_intrinsics;
-            imu_intrinsics      gyro_intrinsics;
-            uint8_t             reserved[64];
-        };
+
 
 #pragma pack(pop)
 
@@ -345,9 +405,61 @@ namespace librealsense
         enum ds5_notifications_types
         {
             success = 0,
-            hot_laser_power_reduce  = 1, // reported to error depth XU control
-            hot_laser_disable       = 2, // reported to error depth XU control
-            flag_B_laser_disable    = 3 // reported to error depth XU control
+            hot_laser_power_reduce,
+            hot_laser_disable,
+            flag_B_laser_disable,
+            stereo_module_not_connected,
+            eeprom_corrupted,
+            calibration_corrupted,
+            mm_upd_fail,
+            isp_upd_fail,
+            mm_force_pause,
+            mm_failure,
+            usb_scp_overflow,
+            usb_rec_overflow,
+            usb_cam_overflow,
+            mipi_left_error,
+            mipi_right_error,
+            mipi_rt_error,
+            mipi_fe_error,
+            i2c_cfg_left_error,
+            i2c_cfg_right_error,
+            i2c_cfg_rt_error,
+            i2c_cfg_fe_error,
+            stream_not_start_z,
+            stream_not_start_y,
+            stream_not_start_cam,
+            rec_error,
+        };
+
+        // Elaborate FW XU report. The reports may be consequently extended for PU/CTL/ISP
+        const std::map< uint8_t, std::string> ds5_fw_error_report = {
+            { success,                      "Success" },
+            { hot_laser_power_reduce,       "Laser hot - power reduce" },
+            { hot_laser_disable,            "Laser hot - disabled" },
+            { flag_B_laser_disable,         "Flag B - laser disabled" },
+            { stereo_module_not_connected,  "Stered Module is not connected" },
+            { eeprom_corrupted,             "EEPROM corrupted" },
+            { calibration_corrupted,        "Calibration corrupted" },
+            { mm_upd_fail,                  "Moton Module update failed" },
+            { isp_upd_fail,                 "ISP update failed" },
+            { mm_force_pause,               "Motion Module force pause" },
+            { mm_failure,                   "Motion Module failure" },
+            { usb_scp_overflow,             "USB SCP overflow" },
+            { usb_rec_overflow,             "USB REC overflow" },
+            { usb_cam_overflow,             "USB CAM overflow" },
+            { mipi_left_error,              "Left MIPI error" },
+            { mipi_right_error,             "Right MIPI error" },
+            { mipi_rt_error,                "RT MIPI error" },
+            { mipi_fe_error,                "FishEye MIPI error" },
+            { i2c_cfg_left_error,           "Left IC2 Config error" },
+            { i2c_cfg_right_error,          "Right IC2 Config error" },
+            { i2c_cfg_rt_error,             "RT IC2 Config error" },
+            { i2c_cfg_fe_error,             "FishEye IC2 Config error" },
+            { stream_not_start_z,           "Depth stream start failure" },
+            { stream_not_start_y,           "IR stream start failure" },
+            { stream_not_start_cam,         "Camera stream start failure" },
+            { rec_error,                    "REC error" },
         };
 
     } // librealsense::ds

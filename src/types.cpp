@@ -12,14 +12,14 @@
 #include <cmath>
 
 #define STRCASE(T, X) case RS2_##T##_##X: {\
-        static std::string s##T##_##X##_str = make_less_screamy(#X);\
+        static const std::string s##T##_##X##_str = make_less_screamy(#X);\
         return s##T##_##X##_str.c_str(); }
 
 namespace librealsense
 {
-    std::string make_less_screamy(const char* str)
+    inline std::string make_less_screamy(const char* str)
     {
-        std::string res = str;
+        std::string res(str);
 
         bool first = true;
         for (auto i = 0; i < res.size(); i++)
@@ -121,6 +121,7 @@ namespace librealsense
                 STRCASE(STREAM, ACCEL)
                 STRCASE(STREAM, GPIO)
                 STRCASE(STREAM, POSE)
+                STRCASE(STREAM, CONFIDENCE)
         default: assert(!is_valid(value)); return UNKNOWN_VALUE;
         }
 #undef CASE
@@ -258,6 +259,7 @@ namespace librealsense
                 CASE(FILTER_SMOOTH_DELTA)
                 CASE(STEREO_BASELINE)
                 CASE(HOLES_FILL)
+                CASE(AUTO_EXPOSURE_CONVERGE_STEP)
         default: assert(!is_valid(value)); return UNKNOWN_VALUE;
         }
 #undef CASE
@@ -314,13 +316,14 @@ namespace librealsense
         switch (value)
         {
             CASE(NAME)
-                CASE(SERIAL_NUMBER)
-                CASE(FIRMWARE_VERSION)
-                CASE(PHYSICAL_PORT)
-                CASE(DEBUG_OP_CODE)
-                CASE(ADVANCED_MODE)
-                CASE(PRODUCT_ID)
-                CASE(CAMERA_LOCKED)
+            CASE(SERIAL_NUMBER)
+            CASE(FIRMWARE_VERSION)
+            CASE(PHYSICAL_PORT)
+            CASE(DEBUG_OP_CODE)
+            CASE(ADVANCED_MODE)
+            CASE(PRODUCT_ID)
+            CASE(CAMERA_LOCKED)
+            CASE(USB_TYPE_DESCRIPTOR)
         default: assert(!is_valid(value)); return UNKNOWN_VALUE;
         }
 #undef CASE
@@ -340,6 +343,8 @@ namespace librealsense
                 CASE(WHITE_BALANCE)
                 CASE(TIME_OF_ARRIVAL)
                 CASE(TEMPERATURE)
+                CASE(BACKEND_TIMESTAMP)
+                CASE(ACTUAL_FPS)
         default: assert(!is_valid(value)); return UNKNOWN_VALUE;
         }
 #undef CASE
