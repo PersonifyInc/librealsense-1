@@ -81,7 +81,7 @@ if (WIN32)
     set(USE_SYSTEM_LIBUSB OFF)
 endif()
 
-option(ENABLE_ZERO_COPY "Enable zero copy functionality" OFF)
+option(ENABLE_ZERO_COPY "Enable zero copy functionality" ON)
 if (ENABLE_ZERO_COPY)
     add_definitions(-DZERO_COPY)
 endif()
