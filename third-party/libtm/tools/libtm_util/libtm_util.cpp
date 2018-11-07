@@ -1368,7 +1368,7 @@ void updateControllerFW(TrackingData::ControllerDiscoveryEventFrame& message, Pr
     }
     else
     {
-        LOGE("Invalid image type input for burning controller fw: %s", gConfiguration.controllerFWFileType);
+        LOGE("Invalid image type input for burning controller fw: %s", gConfiguration.controllerFWFileType.c_str());
         return;
     }
 
