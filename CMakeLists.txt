@@ -120,7 +120,7 @@ elseif(UNIX)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
 endif()
 
-option(BUILD_WITH_TM2 "Build with support for Intel TM2 tracking device" ON)
+option(BUILD_WITH_TM2 "Build with support for Intel TM2 tracking device" OFF)
 
 # Checking Internet connection, as TM2 needs to download the FW from amazon cloud
 if(BUILD_WITH_TM2)
