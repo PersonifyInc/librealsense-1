@@ -813,7 +813,7 @@ if (NOT USE_SYSTEM_LIBUSB)
        set(LIBUSB1_LIBRARY_DIRS ${CMAKE_CURRENT_BINARY_DIR}/libusb_install/lib)
        link_directories(${LIBUSB1_LIBRARY_DIRS})
 
-       set(LIBUSB1_LIBRARIES usb log)
+       set(LIBUSB1_LIBRARIES usb)
     endif()
 endif()
 
