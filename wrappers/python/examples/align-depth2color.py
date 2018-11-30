@@ -27,7 +27,7 @@ profile = pipeline.start(config)
 # Getting the depth sensor's depth scale (see rs-align example for explanation)
 depth_sensor = profile.get_device().first_depth_sensor()
 depth_scale = depth_sensor.get_depth_scale()
-print "Depth Scale is: " , depth_scale
+print("Depth Scale is: " , depth_scale)
 
 # We will be removing the background of objects more than
 #  clipping_distance_in_meters meters away
@@ -48,7 +48,7 @@ try:
         # frames.get_depth_frame() is a 640x360 depth image
         
         # Align the depth frame to color frame
-        aligned_frames = align.proccess(frames)
+        aligned_frames = align.process(frames)
         
         # Get aligned frames
         aligned_depth_frame = aligned_frames.get_depth_frame() # aligned_depth_frame is a 640x480 depth image

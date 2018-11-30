@@ -79,7 +79,7 @@ describe('Frame test', function() {
   });
 
   it('Testing property timestampDomain', () => {
-    assert.equal(typeof frame.timestampDomain, 'string');
+    assert.equal(typeof frame.timestampDomain, 'number');
   });
 
   it('Testing method frameMetadata - 0 argument', () => {
@@ -100,12 +100,18 @@ describe('Frame test', function() {
       i.toUpperCase() !== 'FRAME_METADATA_COUNT' && // skip counter
       i !== 'frameMetadataToString' // skip method
       ) {
-        assert.doesNotThrow(() => { // jshint ignore:line
-          frame.frameMetadata(rs2.frame_metadata[i]);
-        });
-        assert.equal(Object.prototype.toString.call(
-          frame.frameMetadata(rs2.frame_metadata[i])
-        ), '[object Uint8Array]');
+        if (frame.supportsFrameMetadata(rs2.frame_metadata[i])) {
+          assert.doesNotThrow(() => { // jshint ignore:line
+            frame.frameMetadata(rs2.frame_metadata[i]);
+          });
+          assert.equal(Object.prototype.toString.call(
+            frame.frameMetadata(rs2.frame_metadata[i])
+          ), '[object Uint8Array]');
+        } else {
+          assert.throws(() => { // jshint ignore:line
+            frame.frameMetadata(rs2.frame_metadata[i]);
+          });
+        }
       }
     }
   });

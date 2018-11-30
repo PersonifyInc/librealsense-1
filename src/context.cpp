@@ -8,6 +8,7 @@
 
 #include <array>
 #include <chrono>
+#include "l500/l500.h"
 #include "ivcam/sr300.h"
 #include "ds5/ds5-factory.h"
 #include "ds5/ds5-timestamp.h"
@@ -92,7 +93,8 @@ namespace librealsense
     context::context(backend_type type,
                      const char* filename,
                      const char* section,
-                     rs2_recording_mode mode)
+                     rs2_recording_mode mode,
+                     std::string min_api_version)
         : _devices_changed_callback(nullptr, [](rs2_devices_changed_callback*){})
     {
         LOG_DEBUG("Librealsense " << std::string(std::begin(rs2_api_version),std::end(rs2_api_version)));
@@ -106,7 +108,7 @@ namespace librealsense
             _backend = std::make_shared<platform::record_backend>(platform::create_backend(), filename, section, mode);
             break;
         case backend_type::playback:
-            _backend = std::make_shared<platform::playback_backend>(filename, section);
+            _backend = std::make_shared<platform::playback_backend>(filename, section, min_api_version);
 
             break;
         default: throw invalid_value_exception(to_string() << "Undefined backend type " << static_cast<int>(type));
@@ -121,9 +123,9 @@ namespace librealsense
        {
            std::vector<rs2_device_info> rs2_devices_info_added;
            std::vector<rs2_device_info> rs2_devices_info_removed;
-           if(removed) 
+           if(removed)
                rs2_devices_info_removed.push_back({ shared_from_this(), removed });
-           if (added) 
+           if (added)
                rs2_devices_info_added.push_back({ shared_from_this(), added });
            raise_devices_changed(rs2_devices_info_removed, rs2_devices_info_added);
        };
@@ -284,6 +286,13 @@ namespace librealsense
         {
             return rs2_intrinsics {};
         }
+
+        std::vector<tagged_profile> get_profiles_tags() const override
+        {
+            std::vector<tagged_profile> markers;
+            markers.push_back({ RS2_STREAM_COLOR, -1, 640, 480, RS2_FORMAT_RGB8, 30, profile_tag::PROFILE_TAG_SUPERSET | profile_tag::PROFILE_TAG_DEFAULT });
+            return markers;
+        };
     };
 
     std::shared_ptr<device_interface> platform_camera_info::create(std::shared_ptr<context> ctx,
@@ -298,16 +307,17 @@ namespace librealsense
         _device_watcher->stop(); //ensure that the device watcher will stop before the _devices_changed_callback will be deleted
     }
 
-    std::vector<std::shared_ptr<device_info>> context::query_devices() const
+    std::vector<std::shared_ptr<device_info>> context::query_devices(int mask) const
     {
 
         platform::backend_device_group devices(_backend->query_uvc_devices(), _backend->query_usb_devices(), _backend->query_hid_devices());
 
-        return create_devices(devices, _playback_devices);
+        return create_devices(devices, _playback_devices, mask);
     }
 
     std::vector<std::shared_ptr<device_info>> context::create_devices(platform::backend_device_group devices,
-                                                                      const std::map<std::string, std::shared_ptr<device_info>>& playback_devices) const
+                                                                      const std::map<std::string, std::weak_ptr<device_info>>& playback_devices,
+                                                                      int mask) const
     {
         std::vector<std::shared_ptr<device_info>> list;
 
@@ -320,21 +330,34 @@ namespace librealsense
         std::copy(begin(tm2_devices), end(tm2_devices), std::back_inserter(list));
 #endif
 
-        auto ds5_devices = ds5_info::pick_ds5_devices(ctx, devices);
-        std::copy(begin(ds5_devices), end(ds5_devices), std::back_inserter(list));
+        auto l500_devices = l500_info::pick_l500_devices(ctx, devices.uvc_devices, devices.usb_devices);
+        std::copy(begin(l500_devices), end(l500_devices), std::back_inserter(list));
 
-        auto sr300_devices = sr300_info::pick_sr300_devices(ctx, devices.uvc_devices, devices.usb_devices);
-        std::copy(begin(sr300_devices), end(sr300_devices), std::back_inserter(list));
+        if (mask & RS2_PRODUCT_LINE_D400)
+        {
+            auto ds5_devices = ds5_info::pick_ds5_devices(ctx, devices);
+            std::copy(begin(ds5_devices), end(ds5_devices), std::back_inserter(list));
+        }
+
+        if (mask & RS2_PRODUCT_LINE_SR300)
+        {
+            auto sr300_devices = sr300_info::pick_sr300_devices(ctx, devices.uvc_devices, devices.usb_devices);
+            std::copy(begin(sr300_devices), end(sr300_devices), std::back_inserter(list));
+        }
 
         auto recovery_devices = recovery_info::pick_recovery_devices(ctx, devices.usb_devices);
         std::copy(begin(recovery_devices), end(recovery_devices), std::back_inserter(list));
 
-        auto uvc_devices = platform_camera_info::pick_uvc_devices(ctx, devices.uvc_devices);
-        std::copy(begin(uvc_devices), end(uvc_devices), std::back_inserter(list));
+        if (mask & RS2_PRODUCT_LINE_NON_INTEL)
+        {
+            auto uvc_devices = platform_camera_info::pick_uvc_devices(ctx, devices.uvc_devices);
+            std::copy(begin(uvc_devices), end(uvc_devices), std::back_inserter(list));
+        }
 
         for (auto&& item : playback_devices)
         {
-            list.push_back(item.second);
+            if (auto dev = item.second.lock())
+                list.push_back(dev);
         }
 
         return list;
@@ -343,11 +366,11 @@ namespace librealsense
 
     void context::on_device_changed(platform::backend_device_group old,
                                     platform::backend_device_group curr,
-                                    const std::map<std::string, std::shared_ptr<device_info>>& old_playback_devices,
-                                    const std::map<std::string, std::shared_ptr<device_info>>& new_playback_devices)
+                                    const std::map<std::string, std::weak_ptr<device_info>>& old_playback_devices,
+                                    const std::map<std::string, std::weak_ptr<device_info>>& new_playback_devices)
     {
-        auto old_list = create_devices(old, old_playback_devices);
-        auto new_list = create_devices(curr, new_playback_devices);
+        auto old_list = create_devices(old, old_playback_devices, RS2_PRODUCT_LINE_ANY);
+        auto new_list = create_devices(curr, new_playback_devices, RS2_PRODUCT_LINE_ANY);
 
         if (librealsense::list_changed<std::shared_ptr<device_info>>(old_list, new_list, [](std::shared_ptr<device_info> first, std::shared_ptr<device_info> second) {return *first == *second; }))
         {
@@ -443,17 +466,17 @@ namespace librealsense
         return result;
     }
 
-	// TODO: Make template
-	std::vector<platform::usb_device_info> filter_by_product(const std::vector<platform::usb_device_info>& devices, const std::set<uint16_t>& pid_list)
-	{
-		std::vector<platform::usb_device_info> result;
-		for (auto&& info : devices)
-		{
-			if (pid_list.count(info.pid))
-				result.push_back(info);
-		}
-		return result;
-	}
+    // TODO: Make template
+    std::vector<platform::usb_device_info> filter_by_product(const std::vector<platform::usb_device_info>& devices, const std::set<uint16_t>& pid_list)
+    {
+        std::vector<platform::usb_device_info> result;
+        for (auto&& info : devices)
+        {
+            if (pid_list.count(info.pid))
+                result.push_back(info);
+        }
+        return result;
+    }
 
     std::vector<std::pair<std::vector<platform::uvc_device_info>, std::vector<platform::hid_device_info>>> group_devices_and_hids_by_unique_id(
         const std::vector<std::vector<platform::uvc_device_info>>& devices,
@@ -476,7 +499,8 @@ namespace librealsense
 
     std::shared_ptr<device_interface> context::add_device(const std::string& file)
     {
-        if (_playback_devices.find(file) != _playback_devices.end())
+        auto it = _playback_devices.find(file);
+        if (it != _playback_devices.end() && it->second.lock())
         {
             //Already exists
             throw librealsense::invalid_value_exception(to_string() << "File \"" << file << "\" already loaded to context");
@@ -492,7 +516,7 @@ namespace librealsense
     void context::remove_device(const std::string& file)
     {
         auto it = _playback_devices.find(file);
-        if(it == _playback_devices.end())
+        if (!it->second.lock() || it == _playback_devices.end())
         {
             //Not found
             return;
@@ -517,9 +541,9 @@ namespace librealsense
         return result;
     }
 
-	// TODO: Sergey
-	// Make template
-	void trim_device_list(std::vector<platform::usb_device_info>& devices, const std::vector<platform::usb_device_info>& chosen)
+    // TODO: Sergey
+    // Make template
+    void trim_device_list(std::vector<platform::usb_device_info>& devices, const std::vector<platform::usb_device_info>& chosen)
     {
         if (chosen.empty())
             return;

@@ -8,7 +8,6 @@
 
 // Helper functions
 void register_glfw_callbacks(window& app, glfw_state& app_state);
-void draw_pointcloud(window& app, glfw_state& app_state, rs2::points& points);
 
 int main(int argc, char * argv[]) try
 {
@@ -41,6 +40,10 @@ int main(int argc, char * argv[]) try
 
         auto color = frames.get_color_frame();
 
+        // For cameras that don't have RGB sensor, we'll map the pointcloud to infrared instead of color
+        if (!color)
+            color = frames.get_infrared_frame();
+
         // Tell pointcloud object to map to this color frame
         pc.map_to(color);
 
@@ -48,7 +51,7 @@ int main(int argc, char * argv[]) try
         app_state.tex.upload(color);
 
         // Draw the pointcloud
-        draw_pointcloud(app, app_state, points);
+        draw_pointcloud(app.width(), app.height(), app_state, points);
     }
 
     return EXIT_SUCCESS;

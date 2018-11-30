@@ -1,4 +1,4 @@
-// Copyright (c) 2017 Intel Corporation. All rights reserved.
+// Copyright (c) 2018 Intel Corporation. All rights reserved.
 // Use of this source code is governed by an Apache 2.0 license
 // that can be found in the LICENSE file.
 
@@ -45,6 +45,36 @@ describe('DeviceList test', function() {
     assert.equal(typeof devl.size, 'number');
   });
 
+  it('Testing member back', () => {
+    let dev = devl.devices;
+    assert(dev.length > 0); // Device must be connected
+    let device = devl.getDevice(dev.length -1);
+    let SN = device.getCameraInfo().serialNumber;
+    assert.doesNotThrow(() => {
+      if (devl.size > 0) {
+        let res = devl.back;
+        assert(devl.back instanceof rs2.Device);
+        assert.equal(typeof res, 'object');
+        assert.equal(res.getCameraInfo().serialNumber, SN);
+      }
+    });
+  });
+
+  it('Testing member front', () => {
+    let dev = devl.devices;
+    assert(dev.length > 0); // Device must be connected
+    let device = devl.getDevice(0);
+    let SN = device.getCameraInfo().serialNumber;
+    assert.doesNotThrow(() => {
+      if (devl.size > 0) {
+        let res = devl.front;
+        assert(devl.front instanceof rs2.Device);
+        assert.equal(typeof res, 'object');
+        assert.equal(res.getCameraInfo().serialNumber, SN);
+      }
+    });
+  });
+
   it('Testing method destroy', () => {
     assert.notEqual(devl.cxxList, undefined);
     assert.doesNotThrow(() => {
@@ -54,8 +84,9 @@ describe('DeviceList test', function() {
   });
 
   it('Testing method getDevice - without argument', () => {
-    let dev = devl.getDevice();
-    assert(dev instanceof rs2.Device);
+    assert.throws(() => {
+      devl.getDevice();
+    });
   });
 
   it('Testing method getDevice - return value', () => {
@@ -78,8 +109,9 @@ describe('DeviceList test', function() {
   });
 
   it('Testing method getDevice - with invalid argument', () => {
-    let dev = devl.getDevice('dummy');
-    assert(dev instanceof rs2.Device);
+    assert.throws(() => {
+      devl.getDevice('dummy');
+    });
   });
 
   it('Testing method contains - without argument', () => {

@@ -32,6 +32,7 @@ namespace librealsense
         void hardware_reset() override;
         void create_snapshot(std::shared_ptr<debug_interface>& snapshot) const override;
         void enable_recording(std::function<void(const debug_interface&)> record_action) override;
+        platform::usb_spec get_usb_spec() const;
 
     protected:
 
@@ -48,6 +49,7 @@ namespace librealsense
 
         std::shared_ptr<hw_monitor> _hw_monitor;
         firmware_version _fw_version;
+        firmware_version recommended_fw_version;
 
         std::shared_ptr<stream_interface> _depth_stream;
         std::shared_ptr<stream_interface> _left_ir_stream;

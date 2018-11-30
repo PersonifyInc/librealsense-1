@@ -158,6 +158,15 @@ namespace librealsense
     class sr300_camera final : public virtual device, public debug_interface
     {
     public:
+        std::vector<tagged_profile> get_profiles_tags() const override
+        {
+            std::vector<tagged_profile> tags;
+            tags.push_back({ RS2_STREAM_COLOR, -1, 1920, 1080, RS2_FORMAT_RGB8, 30, profile_tag::PROFILE_TAG_SUPERSET | profile_tag::PROFILE_TAG_DEFAULT });
+            tags.push_back({ RS2_STREAM_DEPTH, -1, 640, 480, RS2_FORMAT_Z16, 30, profile_tag::PROFILE_TAG_SUPERSET | profile_tag::PROFILE_TAG_DEFAULT });
+            tags.push_back({ RS2_STREAM_INFRARED, -1, 640, 480, RS2_FORMAT_Y8, 30, profile_tag::PROFILE_TAG_SUPERSET });
+            return tags;
+        };
+
         class preset_option : public option_base
         {
         public:
@@ -228,10 +237,6 @@ namespace librealsense
                     // Register intrinsics
                     auto video = dynamic_cast<video_stream_profile_interface*>(p.get());
 
-
-                    if (video->get_width() == 1920 && video->get_height() == 1080 && video->get_format() == RS2_FORMAT_RGB8 && video->get_framerate() == 30)
-                        video->make_default();
-
                     auto profile = to_profile(p.get());
                     std::weak_ptr<sr300_color_sensor> wp =
                         std::dynamic_pointer_cast<sr300_color_sensor>(this->shared_from_this());
@@ -285,10 +290,6 @@ namespace librealsense
 
                     // Register intrinsics
                     auto video = dynamic_cast<video_stream_profile_interface*>(p.get());
-
-
-                    if (video->get_width() == 640 && video->get_height() == 480 && video->get_format() == RS2_FORMAT_Z16 && video->get_framerate() == 30)
-                        video->make_default();
 
                     auto profile = to_profile(p.get());
                     std::weak_ptr<sr300_depth_sensor> wp =
@@ -363,6 +364,7 @@ namespace librealsense
             color_ep->register_metadata(RS2_FRAME_METADATA_FRAME_TIMESTAMP, make_uvc_header_parser(&platform::uvc_header::timestamp,
                 [](rs2_metadata_type param) { return static_cast<rs2_metadata_type>(param * TIMESTAMP_10NSEC_TO_MSEC); }));
             color_ep->register_metadata(RS2_FRAME_METADATA_FRAME_COUNTER,   make_sr300_attribute_parser(&md_sr300_rgb::frame_counter, md_offset));
+            color_ep->register_metadata(RS2_FRAME_METADATA_ACTUAL_FPS,      make_sr300_attribute_parser(&md_sr300_rgb::actual_fps, md_offset));
             color_ep->register_metadata(RS2_FRAME_METADATA_SENSOR_TIMESTAMP,make_sr300_attribute_parser(&md_sr300_rgb::frame_latency, md_offset));
             color_ep->register_metadata(RS2_FRAME_METADATA_ACTUAL_EXPOSURE, make_sr300_attribute_parser(&md_sr300_rgb::actual_exposure, md_offset, [](rs2_metadata_type param) { return param*100; }));
             color_ep->register_metadata(RS2_FRAME_METADATA_AUTO_EXPOSURE,   make_sr300_attribute_parser(&md_sr300_rgb::auto_exp_mode, md_offset, [](rs2_metadata_type param) { return (param !=1); }));
@@ -410,6 +412,7 @@ namespace librealsense
             depth_ep->register_metadata(RS2_FRAME_METADATA_FRAME_COUNTER,   make_sr300_attribute_parser(&md_sr300_depth::frame_counter, md_offset));
             depth_ep->register_metadata(RS2_FRAME_METADATA_ACTUAL_EXPOSURE, make_sr300_attribute_parser(&md_sr300_depth::actual_exposure, md_offset,
                 [](rs2_metadata_type param) { return param * 100; }));
+            depth_ep->register_metadata(RS2_FRAME_METADATA_ACTUAL_FPS,      make_sr300_attribute_parser(&md_sr300_depth::actual_fps, md_offset));
 
             return depth_ep;
         }

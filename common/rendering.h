@@ -126,6 +126,11 @@ namespace rs2
         }
     };
 
+    inline float3 cross(const float3& a, const float3& b)
+    {
+        return { a.y * b.z - b.y * a.z, a.x * b.z - b.x * a.z, a.x * b.y - a.y * b.x };
+    }
+
     inline float evaluate_plane(const plane& plane, const float3& point)
     {
         return plane.a * point.x + plane.b * point.y + plane.c * point.z + plane.d;
@@ -319,17 +324,17 @@ namespace rs2
             column_major[1] = mat[1][0];
             column_major[2] = mat[2][0];
             column_major[3] = mat[3][0];
-            column_major[4] = mat[0][1]; 
+            column_major[4] = mat[0][1];
             column_major[5] = mat[1][1];
             column_major[6] = mat[2][1];
             column_major[7] = mat[3][1];
-            column_major[8] = mat[0][2]; 
+            column_major[8] = mat[0][2];
             column_major[9] = mat[1][2];
-            column_major[10] = mat[2][2]; 
+            column_major[10] = mat[2][2];
             column_major[11] = mat[3][2];
             column_major[12] = mat[0][3];
-            column_major[13] = mat[1][3]; 
-            column_major[14] = mat[2][3]; 
+            column_major[13] = mat[1][3];
+            column_major[14] = mat[2][3];
             column_major[15] = mat[3][3];
         }
     };
@@ -426,7 +431,7 @@ namespace rs2
             else
             {
                 res.insert(res.end(), res_second_half.begin(), res_second_half.end());
-            }            
+            }
         }
         else
         {
@@ -441,19 +446,17 @@ namespace rs2
     {
         bool inside = false;
         int i = 0, j = 0;
-        for (i = 0, j = polygon.size() - 1; i < polygon.size(); j = i++) 
+        for (i = 0, j = static_cast<int>(polygon.size()) - 1; i < static_cast<int>(polygon.size()); j = i++)
         {
             if (((polygon[i].y > point.y) != (polygon[j].y > point.y)) &&
                 (point.x < (polygon[j].x - polygon[i].x) * (point.y - polygon[i].y) / (polygon[j].y - polygon[i].y) + polygon[i].x))
             {
                 inside = !inside;
             }
-                
         }
         return inside;
     }
 
-    
     struct mouse_info
     {
         float2 cursor;
@@ -999,7 +1002,7 @@ namespace rs2
             last_queue[idx].poll_for_frame(&last[idx]);
             return last[idx];
         }
-		
+
         texture_buffer() : last_queue(), texture(),
             colorize(std::make_shared<colorizer>()) {}
 
@@ -1057,6 +1060,8 @@ namespace rs2
                     if (auto colorized_frame = colorize->colorize(frame).as<video_frame>())
                     {
                         data = colorized_frame.get_data();
+                        // Override the first pixel in the colorized image for occlusion invalidation.
+                        memset((void*)data,0, colorized_frame.get_bytes_per_pixel());
                         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
                                      colorized_frame.get_width(),
                                      colorized_frame.get_height(),
@@ -1077,8 +1082,8 @@ namespace rs2
             case RS2_FORMAT_YUYV: // Display YUYV by showing the luminance channel and packing chrominance into ignored alpha channel
                 glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_LUMINANCE_ALPHA, GL_UNSIGNED_BYTE, data);
                 break;
-            case RS2_FORMAT_UYVY: // Use one color component only to avoid costly UVUY->RGB conversion
-                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_GREEN, GL_UNSIGNED_SHORT, data);
+            case RS2_FORMAT_UYVY: // Use luminance component only to avoid costly UVUY->RGB conversion
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, width, height, 0, GL_LUMINANCE, GL_UNSIGNED_SHORT, data);
                 break;
             case RS2_FORMAT_RGB8: case RS2_FORMAT_BGR8: // Display both RGB and BGR by interpreting them RGB, to show the flipped byte ordering. Obviously, GL_BGR could be used on OpenGL 1.2+
                 glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
@@ -1394,8 +1399,8 @@ namespace rs2
             glLoadIdentity();
 
             draw_grid();
-            draw_axis(0.3, 2);
-            
+            draw_axis(0.3f, 2.f);
+
             // Drawing pose:
             matrix4 pose_trans = tm2_pose_to_world_transformation(pose);
             float model[16];
@@ -1406,7 +1411,7 @@ namespace rs2
             glPushMatrix();
             glLoadMatrixf(model);
 
-            draw_axis(0.3, 2);
+            draw_axis(0.3f, 2.f);
 
             // remove model matrix from the rest of the render
             glPopMatrix();

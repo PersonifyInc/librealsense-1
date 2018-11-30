@@ -79,7 +79,7 @@ inline bool file_exists(const std::string& filename)
     return f.good();
 }
 
-inline bool make_context(const char* id, rs2::context* ctx)
+inline bool make_context(const char* id, rs2::context* ctx, std::string min_api_version = "0.0.0")
 {
     rs2::log_to_file(RS2_LOG_SEVERITY_DEBUG);
 
@@ -130,14 +130,13 @@ inline bool make_context(const char* id, rs2::context* ctx)
         }
         else if (playback)
         {
-            *ctx = rs2::mock_context(base_filename, section);
+            *ctx = rs2::mock_context(base_filename, section, min_api_version);
         }
         command_line_params::instance()._found_any_section = true;
         return true;
     }
     catch (...)
     {
-
         return false;
     }
 
@@ -228,6 +227,15 @@ inline void require_rotation_matrix(const float(&matrix)[9])
     const float row0[] = { matrix[0], matrix[3], matrix[6] };
     const float row1[] = { matrix[1], matrix[4], matrix[7] };
     const float row2[] = { matrix[2], matrix[5], matrix[8] };
+    CAPTURE(row0[0]);
+    CAPTURE(row0[1]);
+    CAPTURE(row0[2]);
+    CAPTURE(row1[0]);
+    CAPTURE(row1[1]);
+    CAPTURE(row1[2]);
+    CAPTURE(row2[0]);
+    CAPTURE(row2[1]);
+    CAPTURE(row2[2]);
     REQUIRE(dot_product(row0, row0) == Approx(1));
     REQUIRE(dot_product(row1, row1) == Approx(1));
     REQUIRE(dot_product(row2, row2) == Approx(1));

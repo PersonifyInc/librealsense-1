@@ -5,7 +5,6 @@
 
 #include "types.h"
 #include "core/streaming.h"
-
 #include <atomic>
 #include <array>
 #include <math.h>
@@ -17,34 +16,74 @@ namespace librealsense
     class frame;
 }
 
-struct frame_additional_data
-{
-    rs2_time_t timestamp = 0;
-    unsigned long long frame_number = 0;
-    rs2_timestamp_domain timestamp_domain = RS2_TIMESTAMP_DOMAIN_HARDWARE_CLOCK;
-    rs2_time_t      system_time = 0;
-    rs2_time_t      frame_callback_started = 0;
-    uint32_t        metadata_size = 0;
-    bool            fisheye_ae_mode = false;
-    std::array<uint8_t,MAX_META_DATA_SIZE> metadata_blob;
-
-    frame_additional_data() {};
-
-    frame_additional_data(double in_timestamp, unsigned long long in_frame_number, double in_system_time, uint8_t md_size, const uint8_t* md_buf)
-        : timestamp(in_timestamp),
-          frame_number(in_frame_number),
-          system_time(in_system_time),
-          metadata_size(md_size)
-    {
-        // Copy up to 255 bytes to preserve metadata as raw data
-        if (metadata_size)
-            std::copy(md_buf,md_buf+ std::min(md_size,MAX_META_DATA_SIZE),metadata_blob.begin());
-    }
-};
 
 namespace librealsense
 {
     typedef std::map<rs2_frame_metadata_value, std::shared_ptr<md_attribute_parser_base>> metadata_parser_map;
+
+    struct frame_additional_data
+    {
+        rs2_time_t timestamp = 0;
+        unsigned long long frame_number = 0;
+        rs2_timestamp_domain timestamp_domain = RS2_TIMESTAMP_DOMAIN_HARDWARE_CLOCK;
+        rs2_time_t      system_time = 0;
+        rs2_time_t      frame_callback_started = 0;
+        uint32_t        metadata_size = 0;
+        bool            fisheye_ae_mode = false;
+        std::array<uint8_t, MAX_META_DATA_SIZE> metadata_blob;
+        rs2_time_t      backend_timestamp = 0;
+        rs2_time_t last_timestamp = 0;
+        unsigned long long last_frame_number = 0;
+        bool is_blocking = false;
+
+        frame_additional_data() {};
+
+        frame_additional_data(double in_timestamp,
+            unsigned long long in_frame_number,
+            double in_system_time,
+            uint8_t md_size,
+            const uint8_t* md_buf,
+            double backend_time,
+            rs2_time_t last_timestamp,
+            unsigned long long last_frame_number,
+            bool in_is_blocking)
+            : timestamp(in_timestamp),
+            frame_number(in_frame_number),
+            system_time(in_system_time),
+            metadata_size(md_size),
+            backend_timestamp(backend_time),
+            last_timestamp(last_timestamp),
+            last_frame_number(last_frame_number),
+            is_blocking(in_is_blocking)
+        {
+            // Copy up to 255 bytes to preserve metadata as raw data
+            if (metadata_size)
+                std::copy(md_buf, md_buf + std::min(md_size, MAX_META_DATA_SIZE), metadata_blob.begin());
+        }
+    };
+
+    class archive_interface : public sensor_part
+    {
+    public:
+        virtual callback_invocation_holder begin_callback() = 0;
+
+        virtual frame_interface* alloc_and_track(const size_t size, const frame_additional_data& additional_data, bool requires_memory) = 0;
+
+        virtual std::shared_ptr<metadata_parser_map> get_md_parsers() const = 0;
+
+        virtual void flush() = 0;
+
+        virtual frame_interface* publish_frame(frame_interface* frame) = 0;
+        virtual void unpublish_frame(frame_interface* frame) = 0;
+        virtual void keep_frame(frame_interface* frame) = 0;
+        virtual ~archive_interface() = default;
+
+    };
+
+    std::shared_ptr<archive_interface> make_archive(rs2_extension type,
+        std::atomic<uint32_t>* in_max_frame_queue_size,
+        std::shared_ptr<platform::time_service> ts,
+        std::shared_ptr<metadata_parser_map> parsers);
 
     // Define a movable but explicitly noncopyable buffer type to hold our frame data
     class frame : public frame_interface
@@ -52,14 +91,16 @@ namespace librealsense
     public:
         std::vector<byte> data;
         frame_additional_data additional_data;
-
+        std::shared_ptr<metadata_parser_map> metadata_parsers = nullptr;
         explicit frame() : ref_count(0), _kept(false), owner(nullptr), on_release() {}
         frame(const frame& r) = delete;
         frame(frame&& r)
             : ref_count(r.ref_count.exchange(0)), _kept(r._kept.exchange(false)),
-              owner(r.owner), on_release()
+            owner(r.owner), on_release()
         {
             *this = std::move(r);
+            if (owner) metadata_parsers = owner->get_md_parsers();
+            if (r.metadata_parsers) metadata_parsers = std::move(r.metadata_parsers);
         }
 
         frame& operator=(const frame& r) = delete;
@@ -72,6 +113,8 @@ namespace librealsense
             on_release = std::move(r.on_release);
             additional_data = std::move(r.additional_data);
             r.owner.reset();
+            if (owner) metadata_parsers = owner->get_md_parsers();
+            if (r.metadata_parsers) metadata_parsers = std::move(r.metadata_parsers);
             return *this;
         }
 
@@ -83,7 +126,6 @@ namespace librealsense
         rs2_timestamp_domain get_frame_timestamp_domain() const override;
         void set_timestamp(double new_ts) override { additional_data.timestamp = new_ts; }
         unsigned long long get_frame_number() const override;
-
         void set_timestamp_domain(rs2_timestamp_domain timestamp_domain) override
         {
             additional_data.timestamp_domain = timestamp_domain;
@@ -116,6 +158,9 @@ namespace librealsense
 
         void mark_fixed() override { _fixed = true; }
         bool is_fixed() const override { return _fixed; }
+
+        void set_blocking(bool state) override { additional_data.is_blocking = state; }
+        bool is_blocking() const override { return additional_data.is_blocking; }
 
     private:
         // TODO: check boost::intrusive_ptr or an alternative
@@ -243,13 +288,13 @@ namespace librealsense
         depth_frame() : video_frame(), _depth_units()
         {
         }
-        
+
         frame_interface* publish(std::shared_ptr<archive_interface> new_owner) override
         {
             _depth_units = optional_value<float>();
             return video_frame::publish(new_owner);
         }
-        
+
         void keep() override
         {
             if (_original) _original->keep();
@@ -264,7 +309,7 @@ namespace librealsense
                 return((depth_frame*)_original.frame)->get_distance(x, y);
 
             uint64_t pixel = 0;
-            switch (get_bpp()/8) // bits per pixel
+            switch (get_bpp() / 8) // bits per pixel
             {
             case 1: pixel = get_frame_data()[y*get_width() + x];                                    break;
             case 2: pixel = reinterpret_cast<const uint16_t*>(get_frame_data())[y*get_width() + x]; break;
@@ -276,8 +321,8 @@ namespace librealsense
             return pixel * get_units();
         }
 
-        float get_units() const 
-        { 
+        float get_units() const
+        {
             if (!_depth_units)
                 _depth_units = query_units(get_sensor());
             return _depth_units.value();
@@ -314,7 +359,7 @@ namespace librealsense
                 try
                 {
                     auto depth_sensor = As<librealsense::depth_sensor>(sensor);
-                    if(depth_sensor != nullptr)
+                    if (depth_sensor != nullptr)
                     {
                         return depth_sensor->get_depth_scale();
                     }
@@ -445,28 +490,4 @@ namespace librealsense
 
     MAP_EXTENSION(RS2_EXTENSION_POSE_FRAME, librealsense::pose_frame);
 
-
-    class archive_interface : public sensor_part
-    {
-    public:
-        virtual callback_invocation_holder begin_callback() = 0;
-
-        virtual frame_interface* alloc_and_track(const size_t size, const frame_additional_data& additional_data, bool requires_memory) = 0;
-
-        virtual std::shared_ptr<metadata_parser_map> get_md_parsers() const = 0;
-
-        virtual void flush() = 0;
-
-        virtual frame_interface* publish_frame(frame_interface* frame) = 0;
-        virtual void unpublish_frame(frame_interface* frame) = 0;
-        virtual void keep_frame(frame_interface* frame) = 0;
-
-        virtual ~archive_interface() = default;
-
-    };
-
-    std::shared_ptr<archive_interface> make_archive(rs2_extension type,
-                                                    std::atomic<uint32_t>* in_max_frame_queue_size,
-                                                    std::shared_ptr<platform::time_service> ts,
-                                                    std::shared_ptr<metadata_parser_map> parsers);
 }

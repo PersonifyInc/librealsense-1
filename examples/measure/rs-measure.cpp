@@ -12,6 +12,8 @@
 #include <unordered_set>
 #include <map>
 #include <thread>
+#include <atomic>
+#include <mutex>
 
 using pixel = std::pair<int, int>;
 
@@ -19,7 +21,7 @@ using pixel = std::pair<int, int>;
 std::array<pixel, 12> neighbors(rs2::depth_frame frame, pixel p);
 
 // Distance 3D is used to calculate real 3D distance between two pixels
-float dist_3d(const rs2_intrinsics& intr, const rs2::depth_frame& frame, pixel u, pixel v);
+float dist_3d(const rs2::depth_frame& frame, pixel u, pixel v);
 // Distance 2D returns the distance in pixels between two pixels
 float dist_2d(const pixel& a, const pixel& b);
 
@@ -28,8 +30,8 @@ float dist_2d(const pixel& a, const pixel& b);
 struct toggle
 {
     toggle() : x(0.f), y(0.f) {}
-    toggle(float x, float y) 
-        : x(std::min(std::max(x, 0.f), 1.f)), 
+    toggle(float x, float y)
+        : x(std::min(std::max(x, 0.f), 1.f)),
           y(std::min(std::max(y, 0.f), 1.f))
     {}
 
@@ -54,7 +56,7 @@ struct toggle
         for (auto i = 0; i <= segments; i++)
         {
             auto t = 2 * M_PI * float(i) / segments;
-            glVertex2f(x * app.width()  + cos(t) * r, 
+            glVertex2f(x * app.width()  + cos(t) * r,
                        y * app.height() + sin(t) * r);
         }
         glEnd();
@@ -64,7 +66,7 @@ struct toggle
 
     // This helper function is used to find the button
     // closest to the mouse cursor
-    // Since we are only comparing this distance, sqrt can be safely skipped 
+    // Since we are only comparing this distance, sqrt can be safely skipped
     float dist_2d(const toggle& other) const
     {
         return pow(x - other.x, 2) + pow(y - other.y, 2);
@@ -91,10 +93,9 @@ void register_glfw_callbacks(window& app, state& app_state);
 // Simple distance is the classic pythagorean distance between 3D points
 // This distance ignores the topology of the object and can cut both through
 // air and through solid
-void render_simple_distance(const rs2::depth_frame& depth, 
+void render_simple_distance(const rs2::depth_frame& depth,
                             const state& s,
-                            const window& app,
-                            const rs2_intrinsics& intr);
+                            const window& app);
 
 // Shortest-path distance approximates the geodesic.
 // Given two points on a surface it will follow with that surface
@@ -122,7 +123,7 @@ int main(int argc, char * argv[]) try
     rs2::spatial_filter spat;
     // Enable hole-filling
     // Hole filling is an agressive heuristic and it gets the depth wrong many times
-    // However, this demo is not built to handle holes 
+    // However, this demo is not built to handle holes
     // (the shortest-path will always prefer to "cut" through the holes since they have zero 3D distance)
     spat.set_option(RS2_OPTION_HOLES_FILL, 5); // 5 = fill all the zero pixels
     // Define temporal filter
@@ -144,7 +145,7 @@ int main(int argc, char * argv[]) try
     auto profile = pipe.start(cfg);
 
     auto sensor = profile.get_device().first<rs2::depth_sensor>();
-    
+
     // TODO: At the moment the SDK does not offer a closed enum for D400 visual presets
     // (because they keep changing)
     // As a work-around we try to find the High-Density preset by name
@@ -156,7 +157,6 @@ int main(int argc, char * argv[]) try
             sensor.set_option(RS2_OPTION_VISUAL_PRESET, i);
 
     auto stream = profile.get_stream(RS2_STREAM_DEPTH).as<rs2::video_stream_profile>();
-    auto intrinsics = stream.get_intrinsics(); // Calibration data
 
     // Create a simple OpenGL window for rendering:
     window app(stream.width(), stream.height(), "RealSense Measure Example");
@@ -171,7 +171,7 @@ int main(int argc, char * argv[]) try
     rs2::frame_queue postprocessed_frames;
 
     // In addition, depth frames will also flow into this queue:
-    rs2::frame_queue pathfinding_queue; 
+    rs2::frame_queue pathfinding_queue;
 
     // Alive boolean will signal the worker threads to finish-up
     std::atomic_bool alive{ true };
@@ -183,7 +183,7 @@ int main(int argc, char * argv[]) try
 
     // Video-processing thread will fetch frames from the camera,
     // apply post-processing and send the result to the main thread for rendering
-    // It recieves synchronized (but not spatially aligned) pairs 
+    // It recieves synchronized (but not spatially aligned) pairs
     // and outputs synchronized and aligned pairs
     std::thread video_processing_thread([&]() {
         // In order to generate new composite frames, we have to wrap the processing
@@ -193,34 +193,35 @@ int main(int argc, char * argv[]) try
                 rs2::frame_source& source) // Frame pool that can allocate new frames
         {
             // First make the frames spatially aligned
-            data = align_to.process(data);
+            data = data.apply_filter(align_to);
 
-            // Next, apply depth post-processing
-            rs2::frame depth = data.get_depth_frame();
             // Decimation will reduce the resultion of the depth image,
             // closing small holes and speeding-up the algorithm
-            depth = dec.process(depth); 
+            data = data.apply_filter(dec);
+
             // To make sure far-away objects are filtered proportionally
             // we try to switch to disparity domain
-            depth = depth2disparity.process(depth);
-            // Apply spatial filtering
-            depth = spat.process(depth);
-            // Apply temporal filtering
-            depth = temp.process(depth);
-            // If we are in disparity domain, switch back to depth
-            depth = disparity2depth.process(depth);
-            // Send the post-processed depth for path-finding
-            pathfinding_queue.enqueue(depth);
+            data = data.apply_filter(depth2disparity);
 
-            // Apply color map for visualization of depth
-            auto colorized = color_map(depth);
-            auto color = data.get_color_frame();
-            // Group the two frames together (to make sure they are rendered in sync)
-            rs2::frameset combined = source.allocate_composite_frame({ colorized, color });
+            // Apply spatial filtering
+            data = data.apply_filter(spat);
+
+            // Apply temporal filtering
+            data = data.apply_filter(temp);
+
+            // If we are in disparity domain, switch back to depth
+            data = data.apply_filter(disparity2depth);
+
+            // Send the post-processed depth for path-finding
+            pathfinding_queue.enqueue(data.get_depth_frame());
+
+            //Apply color map for visualization of depth
+            data = data.apply_filter(color_map);
+
             // Send the composite frame for rendering
-            source.frame_ready(combined);
+            source.frame_ready(data);
         });
-        // Indicate that we want the results of frame_processor 
+        // Indicate that we want the results of frame_processor
         // to be pushed into postprocessed_frames queue
         frame_processor >> postprocessed_frames;
 
@@ -284,7 +285,7 @@ int main(int argc, char * argv[]) try
                         if (dist.find(v) == dist.end()) dist[v] = INFINITY;
 
                         // Calculate distance in 3D between the two neighboring pixels
-                        auto d = dist_3d(intrinsics, depth, u, v);
+                        auto d = dist_3d(depth, u, v);
                         // Calculate total distance from source
                         auto total_dist = dist[u] + d;
 
@@ -329,13 +330,14 @@ int main(int argc, char * argv[]) try
         {
             auto depth = current_frameset.get_depth_frame();
             auto color = current_frameset.get_color_frame();
+            auto colorized_depth = current_frameset.first(RS2_STREAM_DEPTH, RS2_FORMAT_RGB8);
 
             glEnable(GL_BLEND);
             // Use the Alpha channel for blending
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
             // First render the colorized depth image
-            depth_image.render(depth, { 0, 0, app.width(), app.height() });
+            depth_image.render(colorized_depth, { 0, 0, app.width(), app.height() });
             // Next, set global alpha for the color image to 90%
             // (to make it slightly translucent)
             //glColor4f(1.f, 1.f, 1.f, 0.9f);
@@ -354,7 +356,7 @@ int main(int argc, char * argv[]) try
                 // Render the shortest-path as calculated
                 render_shortest_path(depth, path, app, total_dist);
                 // Render the simple pythagorean distance
-                render_simple_distance(depth, app_state, app, intrinsics);
+                render_simple_distance(depth, app_state, app);
 
                 // Render the ruler
                 app_state.ruler_start.render(app);
@@ -411,7 +413,7 @@ std::array<pixel, 12> neighbors(rs2::depth_frame frame, pixel p)
     return res;
 }
 
-float dist_3d(const rs2_intrinsics& intr, const rs2::depth_frame& frame, pixel u, pixel v)
+float dist_3d(const rs2::depth_frame& frame, pixel u, pixel v)
 {
     float upixel[2]; // From pixel
     float upoint[3]; // From point (in 3D)
@@ -434,6 +436,7 @@ float dist_3d(const rs2_intrinsics& intr, const rs2::depth_frame& frame, pixel u
     auto vdist = frame.get_distance(vpixel[0], vpixel[1]);
 
     // Deproject from pixel to point in 3D
+    rs2_intrinsics intr = frame.get_profile().as<rs2::video_stream_profile>().get_intrinsics(); // Calibration data
     rs2_deproject_pixel_to_point(upoint, &intr, upixel, udist);
     rs2_deproject_pixel_to_point(vpoint, &intr, vpixel, vdist);
 
@@ -448,10 +451,9 @@ float dist_2d(const pixel& a, const pixel& b)
     return pow(a.first - b.first, 2) + pow(a.second - b.second, 2);
 }
 
-void render_simple_distance(const rs2::depth_frame& depth, 
+void render_simple_distance(const rs2::depth_frame& depth,
                             const state& s,
-                            const window& app,
-                            const rs2_intrinsics& intr)
+                            const window& app)
 {
     pixel center;
     glColor3f(1.f, 0.0f, 1.0f);
@@ -469,7 +471,7 @@ void render_simple_distance(const rs2::depth_frame& depth,
 
     auto from_pixel = s.ruler_start.get_pixel(depth);
     auto to_pixel =   s.ruler_end.get_pixel(depth);
-    float air_dist = dist_3d(intr, depth, from_pixel, to_pixel);
+    float air_dist = dist_3d(depth, from_pixel, to_pixel);
 
     center.first  = (from_pixel.first + to_pixel.first) / 2;
     center.second = (from_pixel.second + to_pixel.second) / 2;
@@ -523,7 +525,7 @@ void register_glfw_callbacks(window& app, state& app_state)
     app.on_mouse_move = [&](double x, double y)
     {
         toggle cursor{ float(x) / app.width(), float(y) / app.height() };
-        std::vector<toggle*> toggles{ 
+        std::vector<toggle*> toggles{
             &app_state.ruler_start,
             &app_state.ruler_end };
 

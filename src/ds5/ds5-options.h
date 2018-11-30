@@ -131,6 +131,29 @@ namespace librealsense
         std::shared_ptr<auto_exposure_mechanism>    _auto_exposure;
     };
 
+    class auto_exposure_step_option : public option_base
+    {
+    public:
+        auto_exposure_step_option(std::shared_ptr<auto_exposure_mechanism> auto_exposure,
+                                  std::shared_ptr<auto_exposure_state> auto_exposure_state,
+                                  const option_range& opt_range);
+
+        void set(float value) override;
+
+        float query() const override;
+
+        bool is_enabled() const override { return true; }
+
+        const char* get_description() const override
+        {
+            return "Auto-Exposure converge step";
+        }
+
+    private:
+        std::shared_ptr<auto_exposure_state>        _auto_exposure_state;
+        std::shared_ptr<auto_exposure_mechanism>    _auto_exposure;
+    };
+
     class auto_exposure_antiflicker_rate_option : public option_base
     {
     public:
@@ -178,6 +201,30 @@ namespace librealsense
         }
     private:
         ds::depth_table_control get_depth_table(ds::advanced_query_mode mode) const;
+        std::function<void(const option &)> _record_action = [](const option&) {};
+        lazy<option_range> _range;
+        hw_monitor& _hwm;
+    };
+
+    class external_sync_mode : public option
+    {
+    public:
+        external_sync_mode(hw_monitor& hwm);
+        virtual ~external_sync_mode() = default;
+        virtual void set(float value) override;
+        virtual float query() const override;
+        virtual option_range get_range() const override;
+        virtual bool is_enabled() const override { return true; }
+
+        const char* get_description() const override
+        {
+            return "Inter-camera synchronization mode: 0:Default, 1:Master, 2:Slave";
+        }
+        void enable_recording(std::function<void(const option &)> record_action)
+        {
+            _record_action = record_action;
+        }
+    private:
         std::function<void(const option &)> _record_action = [](const option&) {};
         lazy<option_range> _range;
         hw_monitor& _hwm;

@@ -6,7 +6,6 @@
 #include <string>
 #include <memory>
 #include <iomanip>
-#include <ios>      //For std::hexfloat
 #include "core/debug.h"
 #include "core/serialization.h"
 #include "archive.h"
@@ -297,7 +296,7 @@ namespace librealsense
             //Write frame's timestamp as metadata
             diagnostic_msgs::KeyValue frame_timestamp_msg;
             frame_timestamp_msg.key = FRAME_TIMESTAMP_MD_STR;
-            frame_timestamp_msg.value = to_string() << std::hexfloat << pose->get_frame_timestamp();
+            frame_timestamp_msg.value = to_string() << pose->get_frame_timestamp();
             write_message(md_topic, timestamp, frame_timestamp_msg);
             
             // Write the rest of the frame metadata and stream extrinsics
@@ -307,7 +306,7 @@ namespace librealsense
         void write_stream_info(nanoseconds timestamp, const sensor_identifier& sensor_id, std::shared_ptr<stream_profile_interface> profile)
         {
             realsense_msgs::StreamInfo stream_info_msg;
-            stream_info_msg.is_recommended = profile->is_default();
+            stream_info_msg.is_recommended = profile->get_tag() & profile_tag::PROFILE_TAG_DEFAULT;
             convert(profile->get_format(), stream_info_msg.encoding);
             stream_info_msg.fps = profile->get_framerate();
             write_message(ros_topic::stream_info_topic({ sensor_id.device_index, sensor_id.sensor_index, profile->get_stream_type(), static_cast<uint32_t>(profile->get_stream_index()) }), timestamp, stream_info_msg);

@@ -1,16 +1,29 @@
 # .NET Wrapper for Intel RealSense SDK
 
-This folder offers P/Invoke based bindings for most SDK APIs, together with a couple of examples. At the moment we only offer Visual Studio solution file to build on Windows, but it should be possible to use the same bindings on Linux with Mono. 
+This folder offers P/Invoke based bindings for most SDK APIs, together with a couple of examples.
 
 ## Getting Started
 
-To work with Intel RealSense from .NET you will need two libraries next to your application - `realsense2.dll` and `LibrealsenseWrapper.dll`. 
+To work with Intel RealSense from .NET you will need two libraries next to your application - `realsense2.dll` and `Intel.RealSense.dll`. 
 
 In order to get `realsense2.dll` you can either build the SDK [from source using CMake](https://github.com/IntelRealSense/librealsense/blob/master/doc/installation_windows.md) or [install the latest release](https://github.com/IntelRealSense/librealsense/blob/master/doc/distribution_windows.md).
 
-Next navigate to `/wrappers/csharp` and open `Intel.RealSense.SDK.sln` with Visual Studio. 
+Next, download the following prerequisites :
 
-Press `Ctrl + Shift + B` to build the solution. 
+* Visual Studio 2015/2017
+* .NET framework >= 3.5 (.NET 3.5 is required for Unity the unity wrapper)
+
+
+After installing all prerequisites, generate 'realsense2.sln' with 'BUILD_CSHARP_BINDINGS' and 'BUILD_SHARED_LIBS' flags using cmake.
+
+- Generate the VS solution using cmake (run from librealsense root dir):
+  - mkdir build
+  - cd build
+  - cmake .. -DBUILD_CSHARP_BINDINGS=ON -DBUILD_SHARED_LIBS=ON
+
+The file 'realsense2.sln' should be created in 'build' folder, open the file with Visual Studio, C# examples and library will be available in the solution under 'Wrappers/csharp'.
+
+Both the native library and the .NET wrapper are built by default as part of the examples dependencies.
 
 ## Hello World
 

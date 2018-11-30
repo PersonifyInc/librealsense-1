@@ -60,8 +60,8 @@ namespace librealsense
         uint32_t get_framerate() const override;
         void set_framerate(uint32_t val) override;
 
-        bool is_default() const override;
-        void make_default() override;
+        int get_tag() const override;
+        void tag_profile(int tag) override;
 
         int get_unique_id() const override { return _uid; }
         void set_unique_id(int uid) override
@@ -83,7 +83,7 @@ namespace librealsense
         rs2_stream _type = RS2_STREAM_ANY;
         rs2_format _format = RS2_FORMAT_ANY;
         uint32_t _framerate = 0;
-        bool _is_default = false;
+        int _tag = profile_tag::PROFILE_TAG_ANY;
         rs2_stream_profile _c_wrapper;
         rs2_stream_profile* _c_ptr = nullptr;
     };
@@ -92,7 +92,7 @@ namespace librealsense
     {
     public:
         explicit video_stream_profile(platform::stream_profile sp)
-            : stream_profile_base( std::move(sp)),
+            : stream_profile_base(std::move(sp)),
               _calc_intrinsics([]() -> rs2_intrinsics { throw not_implemented_exception("No intrinsics are available for this stream profile!"); }),
               _width(0), _height(0)
         {
@@ -151,7 +151,7 @@ namespace librealsense
             }
             rs2_motion_device_intrinsic get_intrinsics() const override { return _calc_intrinsics(); }
             void set_intrinsics(std::function<rs2_motion_device_intrinsic()> calc) override { _calc_intrinsics = calc; }
-            
+
             void update(std::shared_ptr<extension_snapshot> ext) override
             {
                 return; //TODO: apply changes here
@@ -166,7 +166,7 @@ namespace librealsense
         explicit pose_stream_profile(platform::stream_profile sp) : stream_profile_base(std::move(sp)) {}
         void update(std::shared_ptr<extension_snapshot> ext) override { /*Nothing to do here*/ }
     };
-	
+
     inline stream_profile to_profile(const stream_profile_interface* sp)
     {
         auto fps = static_cast<uint32_t>(sp->get_framerate());

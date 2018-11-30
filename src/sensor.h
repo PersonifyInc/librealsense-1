@@ -37,10 +37,7 @@ namespace librealsense
 
         virtual stream_profiles init_stream_profiles() = 0;
 
-        stream_profiles get_stream_profiles() const override
-        {
-            return *_profiles;
-        }
+        stream_profiles get_stream_profiles(int tag = profile_tag::PROFILE_TAG_ANY) const override;
 
         virtual stream_profiles get_active_streams() const override;
         notifications_callback_ptr get_notifications_callback() const override;
@@ -88,6 +85,7 @@ namespace librealsense
                            std::shared_ptr<stream_profile_interface> target) const;
 
         std::vector<request_mapping> resolve_requests(stream_profiles requests);
+        std::shared_ptr<stream_profile_interface> map_requests(std::shared_ptr<stream_profile_interface> request);
 
         std::vector<platform::stream_profile> _internal_config;
 
@@ -100,6 +98,7 @@ namespace librealsense
 
         frame_source _source;
         device* _owner;
+        std::vector<platform::stream_profile> _uvc_profiles;
 
     private:
         lazy<stream_profiles> _profiles;
@@ -170,17 +169,13 @@ namespace librealsense
         uint32_t fps_to_sampling_frequency(rs2_stream stream, uint32_t fps) const;
     };
 
-    class uvc_sensor : public sensor_base,
-                       public roi_sensor_interface
+    class uvc_sensor : public sensor_base
     {
     public:
         explicit uvc_sensor(std::string name, std::shared_ptr<platform::uvc_device> uvc_device,
                             std::unique_ptr<frame_timestamp_reader> timestamp_reader, device* dev);
 
         ~uvc_sensor();
-
-        region_of_interest_method& get_roi_method() const override;
-        void set_roi_method(std::shared_ptr<region_of_interest_method> roi_method) override;
 
         void open(const stream_profiles& requests) override;
 
@@ -204,6 +199,9 @@ namespace librealsense
         void start(frame_callback_ptr callback) override;
 
         void stop() override;
+
+        platform::usb_spec get_usb_specification() const { return _device->get_usb_specification(); }
+        std::string get_device_path() const { return _device->get_device_location(); }
 
     protected:
         stream_profiles init_stream_profiles() override;
@@ -231,8 +229,14 @@ namespace librealsense
 
             ~power()
             {
-                auto strong = _owner.lock();
-                if (strong) strong->release_power();
+                if (auto strong = _owner.lock())
+                {
+                    try
+                    {
+                        strong->release_power();
+                    }
+                    catch (...) {}
+                }
             }
         private:
             std::weak_ptr<uvc_sensor> _owner;
@@ -245,6 +249,5 @@ namespace librealsense
         std::vector<platform::extension_unit> _xus;
         std::unique_ptr<power> _power;
         std::unique_ptr<frame_timestamp_reader> _timestamp_reader;
-        std::shared_ptr<region_of_interest_method> _roi_method = nullptr;
     };
 }

@@ -9,6 +9,7 @@
 #include "ds5/ds5-private.h"
 #include "proc/synthetic-stream.h"
 #include "proc/disparity-transform.h"
+#include "software-device.h"
 #include "environment.h"
 
 namespace librealsense
@@ -18,7 +19,8 @@ namespace librealsense
         _update_target(false),
         _stereoscopic_depth(false),
         _focal_lenght_mm(0.f),
-        _stereo_baseline_mm(0.f),
+        _stereo_baseline(0.f),
+        _depth_units(0.f),
         _d2d_convert_factor(0.f),
         _width(0), _height(0), _bpp(0)
     {
@@ -30,6 +32,7 @@ namespace librealsense
         transform_opt->set_description(true, "Depth to Disparity");
         transform_opt->on_set([this, transform_opt](float val)
         {
+            std::lock_guard<std::mutex> lock(_mutex);
             if (!transform_opt->is_valid(val))
                 throw invalid_value_exception(to_string() << "Unsupported transformation mode" << (int)val << " is out of range.");
 
@@ -38,40 +41,47 @@ namespace librealsense
 
         unregister_option(RS2_OPTION_FRAMES_QUEUE_SIZE);
 
-        auto on_frame = [this](rs2::frame f, const rs2::frame_source& source)
-        {
-            rs2::frame out = f;
-            rs2::frame tgt, depth_data;
-
-            bool composite = f.is<rs2::frameset>();
-
-            tgt = depth_data = (composite) ? f.as<rs2::frameset>().first_or_default(RS2_STREAM_DEPTH) : f;
-
-            // Verify that the input depth format is aligned with the block's configuration
-            if (depth_data &&  (f.is<rs2::disparity_frame>() != _transform_to_disparity))
-            {
-                update_transformation_profile(depth_data);
-
-                if (_stereoscopic_depth && (tgt = prepare_target_frame(depth_data, source)))
-                {
-                    auto src = depth_data.as<rs2::video_frame>();
-
-                    if (_transform_to_disparity)
-                        convert<uint16_t, float>(src.get_data(), const_cast<void*>(tgt.get_data()));
-                    else
-                        convert<float, uint16_t>(src.get_data(), const_cast<void*>(tgt.get_data()));
-                }
-            }
-
-            out = composite ? source.allocate_composite_frame({ tgt }) : tgt;
-
-            source.frame_ready(out);
-        };
-
-        auto callback = new rs2::frame_processor_callback<decltype(on_frame)>(on_frame);
-        processing_block::set_processing_callback(std::shared_ptr<rs2_frame_processor_callback>(callback));
-
         on_set_mode(_transform_to_disparity);
+    }
+
+    bool disparity_transform::should_process(const rs2::frame& frame)
+    {
+        if (!frame)
+            return false;
+
+        if (frame.is<rs2::frameset>())
+            return false;
+    
+        if (_transform_to_disparity && (frame.get_profile().stream_type() != RS2_STREAM_DEPTH || frame.get_profile().format() != RS2_FORMAT_Z16))
+            return false;
+
+        if (!_transform_to_disparity && (frame.get_profile().stream_type() != RS2_STREAM_DEPTH ||
+            (frame.get_profile().format() != RS2_FORMAT_DISPARITY16 && frame.get_profile().format() != RS2_FORMAT_DISPARITY32)))
+            return false;
+
+        if (frame.is<rs2::disparity_frame>() == _transform_to_disparity)
+            return false;
+
+        return true;
+    }
+
+    rs2::frame disparity_transform::process_frame(const rs2::frame_source& source, const rs2::frame& f)
+    {
+        rs2::frame tgt;
+
+        update_transformation_profile(f);
+
+        if (_stereoscopic_depth && (tgt = prepare_target_frame(f, source)))
+        {
+            auto src = f.as<rs2::video_frame>();
+
+            if (_transform_to_disparity)
+                convert<uint16_t, float>(src.get_data(), const_cast<void*>(tgt.get_data()));
+            else
+                convert<float, uint16_t>(src.get_data(), const_cast<void*>(tgt.get_data()));
+        }
+
+        return tgt;
     }
 
     void disparity_transform::on_set_mode(bool to_disparity)
@@ -97,20 +107,39 @@ namespace librealsense
             {
                 librealsense::depth_stereo_sensor* ptr;
                 if (_stereoscopic_depth = a->extend_to(TypeToExtension<librealsense::depth_stereo_sensor>::value, (void**)&ptr))
+                {
                     dss = ptr;
+                    _depth_units = dss->get_depth_scale();
+                    _stereo_baseline = dss->get_stereo_baseline_mm()*0.001f;
+                }
+            }
+            else if (auto depth_emul = As<librealsense::software_sensor>(snr))
+            {
+                // Software device can obtain these options via Options interface
+                if (depth_emul->supports_option(RS2_OPTION_DEPTH_UNITS))
+                    _depth_units = depth_emul->get_option(RS2_OPTION_DEPTH_UNITS).query();
+                if (depth_emul->supports_option(RS2_OPTION_STEREO_BASELINE))
+                    _stereo_baseline = depth_emul->get_option(RS2_OPTION_STEREO_BASELINE).query();
+                _stereoscopic_depth = true;
             }
             else // Live sensor
             {
                 _stereoscopic_depth = Is<librealsense::depth_stereo_sensor>(snr);
-                dss = As<librealsense::depth_stereo_sensor>(snr);
+                if (_stereoscopic_depth)
+                {
+                    dss = As<librealsense::depth_stereo_sensor>(snr);
+                    _depth_units = dss->get_depth_scale();
+                    _stereo_baseline = dss->get_stereo_baseline_mm()* 0.001f;
+                }
             }
 
             if (_stereoscopic_depth)
             {
-                _stereo_baseline_mm = dss->get_stereo_baseline_mm();
                 auto vp = _source_stream_profile.as<rs2::video_stream_profile>();
                 _focal_lenght_mm    = vp.get_intrinsics().fx;
-                _d2d_convert_factor = _stereo_baseline_mm * _focal_lenght_mm;
+                const uint8_t fractional_bits = 5;
+                const uint8_t fractions = 1 << fractional_bits;
+                _d2d_convert_factor = (_stereo_baseline * _focal_lenght_mm * fractions) / _depth_units;
                 _width = vp.width();
                 _height = vp.height();
                 _update_target = true;

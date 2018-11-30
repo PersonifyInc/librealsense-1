@@ -55,7 +55,9 @@ namespace librealsense
 
         size_t find_sensor_idx(const sensor_interface& s) const;
 
-        std::shared_ptr<context> get_context() const override { return _context; }
+        std::shared_ptr<context> get_context() const override {
+            return _context;
+        }
 
         platform::backend_device_group get_device_data() const override
         {
@@ -69,6 +71,8 @@ namespace librealsense
             std::lock_guard<std::mutex> lock(_device_changed_mtx);
             return _is_valid;
         }
+
+        void tag_profiles(stream_profiles profiles) const override;
 
     protected:
         int add_sensor(std::shared_ptr<sensor_interface> sensor_base);
@@ -88,5 +92,6 @@ namespace librealsense
         bool _is_valid, _device_changed_notifications;
         mutable std::mutex _device_changed_mtx;
         uint64_t _callback_id;
+        lazy<std::vector<tagged_profile>> _profiles_tags;
     };
 }

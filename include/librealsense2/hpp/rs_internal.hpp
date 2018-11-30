@@ -41,11 +41,12 @@ namespace rs2
         * \param[in] filename string of the name of the file
         */
         mock_context(const std::string& filename,
-                     const std::string& section = "")
+                     const std::string& section = "",
+                     const std::string& min_api_version = "0.0.0")
         {
             rs2_error* e = nullptr;
             _context = std::shared_ptr<rs2_context>(
-                rs2_create_mock_context(RS2_API_VERSION, filename.c_str(), section.c_str(), &e),
+                rs2_create_mock_context_versioned(RS2_API_VERSION, filename.c_str(), section.c_str(), min_api_version.c_str(), &e),
                 rs2_delete_context);
             error::handle(e);
         }
@@ -96,6 +97,18 @@ namespace rs2
         {
             rs2_error* e = nullptr;
             rs2_software_sensor_on_video_frame(_sensor.get(), frame, &e);
+            error::handle(e);
+        }
+
+        /**
+        * Set frame metadata for the upcoming frames
+        * \param[in] value metadata key to set
+        * \param[in] type metadata value
+        */
+        void set_metadata(rs2_frame_metadata_value value, rs2_metadata_type type)
+        {
+            rs2_error* e = nullptr;
+            rs2_software_sensor_set_metadata(_sensor.get(), value, type, &e);
             error::handle(e);
         }
 
@@ -151,7 +164,6 @@ namespace rs2
             error::handle(e);
             return dev;
         }
-       
 
     public:
         software_device()
@@ -172,7 +184,6 @@ namespace rs2
             error::handle(e);
 
             return software_sensor(sensor);
-            
         }
 
         /**
@@ -185,7 +196,6 @@ namespace rs2
             rs2_software_device_create_matcher(_dev.get(), matcher, &e);
             error::handle(e);
         }
-       
     };
 
 }

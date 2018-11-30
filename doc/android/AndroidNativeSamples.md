@@ -14,7 +14,7 @@ This document describes how to build the Intel® RealSense™ SDK 2.0 including 
 7. Open Terminal on the host machine, navigate to *librealsense* root directory and type the following lines:
 ```shell
 mkdir build && cd build
-cmake .. -DANDROID_ABI=<Application Binary Interface> -DCMAKE_TOOLCHAIN_FILE=<Path to NDK folder>/build/cmake/android.toolchain.cmake
+cmake .. -DANDROID_ABI=<Application Binary Interface> -DCMAKE_TOOLCHAIN_FILE=<Path to NDK folder>/build/cmake/android.toolchain.cmake -DFORCE_LIBUVC=TRUE -DBUILD_SHARED_LIBS=false
 make
 ```
 
@@ -23,7 +23,6 @@ make
 8. When compilation done type the following lines to store the binaries at the same location to easily copy them to your Android device.
 ```shell
 mkdir lrs_binaries && cd lrs_binaries
-cp ../librealsense2.so ./
 cp ../examples/C/color/rs-color ./
 cp ../examples/C/depth/rs-depth ./
 cp ../examples/C/distance/rs-distance ./
@@ -36,7 +35,7 @@ cp ../tools/terminal/rs-terminal ./
 9. Connect your Android device to the host machine using USB OTG cable.
 10. Create new folder and copy the binaries to your Android device using ADB by the following lines:
 ```shell
-adb shell mkdir /storage/emulated/legacy/lrs_binaries
+adb shell mkdir -p /storage/emulated/legacy/lrs_binaries
 adb push . /storage/emulated/legacy/lrs_binaries/
 ```
 

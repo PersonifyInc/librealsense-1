@@ -54,7 +54,8 @@ namespace librealsense
             hid_get_custom_report_data,
             device_watcher_start,
             device_watcher_event,
-            device_watcher_stop
+            device_watcher_stop,
+            uvc_get_usb_specification
         };
 
         class compression_algorithm
@@ -110,7 +111,7 @@ namespace librealsense
 
             double get_time();
             void save(const char* filename, const char* section, bool append = false) const;
-            static std::shared_ptr<recording> load(const char* filename, const char* section, std::shared_ptr<playback_device_watcher> watcher = nullptr);
+            static std::shared_ptr<recording> load(const char* filename, const char* section, std::shared_ptr<playback_device_watcher> watcher = nullptr, std::string min_api_version = "");
 
             int save_blob(const void* ptr, size_t size);
 
@@ -342,6 +343,7 @@ namespace librealsense
             void lock() const override;
             void unlock() const override;
             std::string get_device_location() const override;
+            usb_spec get_usb_specification() const override;
 
             explicit record_uvc_device(
                 std::shared_ptr<uvc_device> source,
@@ -520,6 +522,7 @@ namespace librealsense
             void lock() const override;
             void unlock() const override;
             std::string get_device_location() const override;
+            usb_spec get_usb_specification() const override;
 
             explicit playback_uvc_device(std::shared_ptr<recording> rec, int id);
 
@@ -590,7 +593,7 @@ namespace librealsense
             std::shared_ptr<time_service> create_time_service() const override;
             std::shared_ptr<device_watcher> create_device_watcher() const override;
 
-            explicit playback_backend(const char* filename, const char* section);
+            explicit playback_backend(const char* filename, const char* section, std::string min_api_version);
         private:
 
             std::shared_ptr<playback_device_watcher> _device_watcher;
