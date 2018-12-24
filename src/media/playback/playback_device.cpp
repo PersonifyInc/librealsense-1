@@ -205,7 +205,9 @@ void playback_device::set_frame_rate(double rate)
     LOG_INFO("Request to change playback frame rate to: " << rate);
     if(rate < 0)
     {
-        throw invalid_value_exception(to_string() << "Failed to set frame rate to " << std::to_string(rate) << ", value is less than 0");
+        std::stringstream ss;
+        ss << "Failed to set frame rate to " << rate << ", value is less than 0";
+        throw invalid_value_exception(ss.str());
     }
     (*m_read_thread)->invoke([this, rate](dispatcher::cancellable_timer t)
     {

@@ -130,12 +130,18 @@ namespace librealsense
 
     inline void convert(const std::string& source, double& target)
     {
-        target = std::stod(source);
+        //target = std::stod(source);
+        std::stringstream ss;
+        ss << source;
+        ss >> target;
     }
 
     inline void convert(const std::string& source, long long& target)
     {
-        target = std::stoll(source);
+        //target = std::stoll(source);
+        std::stringstream ss;
+        ss << source;
+        ss >> target;
     }
     /*
     quat2rot(), rot2quat()
@@ -236,7 +242,12 @@ namespace librealsense
 
         static uint32_t get_extrinsic_group_index(const std::string& topic)
         {
-            return std::stoul(get<5>(topic));
+            //return std::stoul(get<5>(topic));
+            std::stringstream ss;
+            ss << get<5>(topic);
+            uint32_t id;
+            ss >> id;
+            return id;
         }
 
         static std::string get_option_name(const std::string& topic)
@@ -315,7 +326,10 @@ namespace librealsense
 
         static std::string stream_extrinsic_topic(const device_serializer::stream_identifier& stream_id, uint32_t ref_id)
         {
-            return create_from({ stream_full_prefix(stream_id), "tf", std::to_string(ref_id) });
+            //return create_from({ stream_full_prefix(stream_id), "tf", std::to_string(ref_id)});
+            std::stringstream ss;
+            ss << ref_id;
+            return create_from({ stream_full_prefix(stream_id), "tf", ss.str()});
         }
 
         static std::string  additional_info_topic()
@@ -398,20 +412,42 @@ namespace librealsense
             }
 
             std::string id_str = str.substr(prefix.size());
-            return static_cast<uint32_t>(std::stoll(id_str));
+
+            //return static_cast<uint32_t>(std::stoll(id_str));
+            std::stringstream ss;
+            ss << id_str;
+            uint32_t id;
+            ss >> id;
+            return id;
         }
 
         static std::string device_prefix(uint32_t device_id)
         {
-            return "device_" + std::to_string(device_id);
+            //return "device_" + std::to_string(device_id);
+
+            std::stringstream ss;
+            ss << "device_";
+            ss << device_id;
+            return ss.str();
         }
         static std::string sensor_prefix(uint32_t sensor_id)
         {
-            return "sensor_" + std::to_string(sensor_id);
+            //return "sensor_" + std::to_string(sensor_id);
+
+            std::stringstream ss;
+            ss << "sensor_";
+            ss << sensor_id;
+            return ss.str();
         }
         static std::string stream_prefix(rs2_stream type, uint32_t stream_id)
         {
-            return std::string(rs2_stream_to_string(type)) + "_" + std::to_string(stream_id);
+            //return std::string(rs2_stream_to_string(type)) + "_" + std::to_string(stream_id);
+
+            std::stringstream ss;
+            ss << rs2_stream_to_string(type);
+            ss << "_";
+            ss << stream_id;
+            return ss.str();
         }
     };
 
@@ -457,7 +493,7 @@ namespace librealsense
         {
            return  to_string() << "/device_" << stream_id.device_index
                                << "/sensor_" << stream_id.sensor_index
-                               << "/" << get_string(stream_id.stream_type) << "_" << stream_id.stream_index;							   
+                               << "/" << get_string(stream_id.stream_type) << "_" << stream_id.stream_index;
         }
 
     private:
@@ -499,7 +535,7 @@ namespace librealsense
     class OptionsQuery : public RegexTopicQuery
     {
     public:
-        OptionsQuery() : 
+        OptionsQuery() :
             RegexTopicQuery(to_string() << R"RRR(/device_\d+/sensor_\d+/option/.*/value)RRR") {}
     };
 
@@ -545,7 +581,7 @@ namespace librealsense
     {
         if (t == get_static_file_info_timestamp())
             return ros::TIME_MIN;
-        
+
         auto secs = std::chrono::duration_cast<std::chrono::duration<double>>(t);
         return ros::Time(secs.count());
     }
@@ -566,7 +602,7 @@ namespace librealsense
         constexpr const char* EXTENDED_STATUS = "{ 0xff6e50db, 0x3c5f, 0x43e7,{ 0xb4, 0x82, 0xb8, 0xc3, 0xa6, 0x8e, 0x78, 0xcd } }";
         constexpr const char* SERIAL_NUMBER = "{ 0x7d3e44e7, 0x8970, 0x4a32,{ 0x8e, 0xee, 0xe8, 0xd1, 0xd1, 0x32, 0xa3, 0x22 } }";
         constexpr const char* TIMESTAMP_SORT_TYPE = "{ 0xb409b217, 0xe5cd, 0x4a04,{ 0x9e, 0x85, 0x1a, 0x7d, 0x59, 0xd7, 0xe5, 0x61 } }";
-        
+
         constexpr const char* DEPTH = "DEPTH";
         constexpr const char* COLOR = "COLOR";
         constexpr const char* INFRARED = "INFRARED";
@@ -620,7 +656,7 @@ namespace librealsense
             switch (source)
             {
             case 0 /*camera*/: //[[fallthrough]]
-            case 1 /*microcontroller*/ : 
+            case 1 /*microcontroller*/ :
                 return RS2_TIMESTAMP_DOMAIN_HARDWARE_CLOCK;
             case 2: return RS2_TIMESTAMP_DOMAIN_SYSTEM_TIME;
            }
@@ -661,12 +697,13 @@ namespace librealsense
         {
             return file_version();
         }
-     
+
         inline std::string stream_type_to_string(const stream_descriptor& source)
         {
             //Other than 6DOF, streams are in the form of "<stream_type><stream_index>" where "stream_index" is empty for index 0/1 and the actual number for 2 and above
             //6DOF is in the form "rs_6DoF<stream_index>" where "stream_index" is a zero based index
             std::string name;
+            std::stringstream ss;
             switch (source.type)
             {
             case RS2_STREAM_DEPTH: name = DEPTH; break;
@@ -677,24 +714,34 @@ namespace librealsense
             case RS2_STREAM_ACCEL: name = ACCEL; break;
             case RS2_STREAM_POSE: name = POSE; break;
             default:
-                throw io_exception(to_string() << "Unknown stream type : " << source.type);
+                //throw io_exception(to_string() << "Unknown stream type : " << source.type);
+                ss << "Unknown stream type : " << source.type;
+                throw io_exception(ss.str());
             }
             if (source.type == RS2_STREAM_POSE)
             {
-                return name  + std::to_string(source.index);
+                ss.str("");
+                ss << source.index;
+                return name  + ss.str();
             }
             else
             {
                 if (source.index == 1)
                 {
-                    throw io_exception(to_string() << "Unknown index for type : " << source.type << ", index = " << source.index);
+                    //throw io_exception(to_string() << "Unknown index for type : " << source.type << ", index = " << source.index);
+                    ss.str("");
+                    ss << "Unknown index for type : " << source.type << ", index = " << source.index;
+                    throw io_exception(ss.str());
                 }
-                return name + (source.index == 0 ? "" : std::to_string(source.index));
+                ss.str("");
+                ss << source.index;
+                return name + (source.index == 0 ? "" : ss.str());
             }
         }
 
         inline stream_descriptor parse_stream_type(const std::string& source)
         {
+            std::stringstream ss;
             stream_descriptor retval{};
             auto starts_with = [source](const std::string& s) {return source.find(s) == 0; };
             std::string type_str;
@@ -732,21 +779,32 @@ namespace librealsense
             {
                 retval.type = RS2_STREAM_POSE;
                 auto index_str = source.substr(std::string(POSE).length());
-                retval.index = std::stoi(index_str);
+                //retval.index = std::stoi(index_str);
+                ss.str("");
+                ss << index_str;
+                ss >> retval.index;
                 return retval;
             }
             else
-                throw io_exception(to_string() << "Unknown stream type : " << source);
+            {
+                ss.str("");
+                ss << "Unknown stream type : " << source;
+                throw io_exception(ss.str());
+            }
 
             auto index_str = source.substr(type_str.length());
             if (index_str.empty())
             {
-                    
+
                 retval.index = 0;
             }
             else
             {
-                int index = std::stoi(index_str);
+                ss.str("");
+                ss << index_str;
+                //int index = std::stoi(index_str);
+                int index;
+                ss >> index;
                 assert(index != 1);
                 retval.index = index;
             }
@@ -761,9 +819,9 @@ namespace librealsense
             //    /camera/rs_6DoF<id>/0
             //   /imu/ACCELEROMETER/imu_raw/0
             //   /imu/GYROMETER/imu_raw/0
-            FrameQuery() : MultipleRegexTopicQuery({ 
-                to_string() << R"RRR(/(camera|imu)/.*/(image|imu)_raw/\d+)RRR" ,
-                to_string() << R"RRR(/camera/rs_6DoF\d+/\d+)RRR" }) {}
+            FrameQuery() : MultipleRegexTopicQuery({
+                std::string(R"RRR(/(camera|imu)/.*/(image|imu)_raw/\d+)RRR") ,
+                std::string(R"RRR(/camera/rs_6DoF\d+/\d+)RRR") }) {}
         };
 
         inline bool is_camera(rs2_stream s)
@@ -780,8 +838,8 @@ namespace librealsense
         {
         public:
             StreamQuery(const device_serializer::stream_identifier& stream_id) :
-                RegexTopicQuery(to_string() 
-                    << (is_camera(stream_id.stream_type) ? "/camera/" : "/imu/") 
+                RegexTopicQuery(to_string()
+                    << (is_camera(stream_id.stream_type) ? "/camera/" : "/imu/")
                     << stream_type_to_string({ stream_id.stream_type, (int)stream_id.stream_index})
                     << ((stream_id.stream_type == RS2_STREAM_POSE) ? "/" : (is_camera(stream_id.stream_type)) ? "/image_raw/" : "/imu_raw/")
                     << stream_id.sensor_index)
@@ -805,9 +863,19 @@ namespace librealsense
             auto stream = parse_stream_type(ros_topic::get<2>(topic));
             uint32_t sensor_index;
             if(stream.type == RS2_STREAM_POSE)
-                sensor_index = static_cast<uint32_t>(std::stoll(ros_topic::get<3>(topic)));
+            {
+                //sensor_index = static_cast<uint32_t>(std::stoll(ros_topic::get<3>(topic)));
+                std::stringstream ss;
+                ss << ros_topic::get<3>(topic);
+                ss >> sensor_index;
+            }
             else
-                sensor_index = static_cast<uint32_t>(std::stoll(ros_topic::get<4>(topic)));
+            {
+                //sensor_index = static_cast<uint32_t>(std::stoll(ros_topic::get<4>(topic)));
+                std::stringstream ss;
+                ss << ros_topic::get<4>(topic);
+                ss >> sensor_index;
+            }
 
             return device_serializer::stream_identifier{ 0u,   static_cast<uint32_t>(sensor_index),  stream.type, static_cast<uint32_t>(stream.index) };
         }

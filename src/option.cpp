@@ -37,7 +37,13 @@ void librealsense::uvc_pu_option::set(float value)
         [this, value](platform::uvc_device& dev)
         {
             if (!dev.set_pu(_id, static_cast<int32_t>(value)))
-                throw invalid_value_exception(to_string() << "set_pu(id=" << std::to_string(_id) << ") failed!" << " Last Error: " << strerror(errno));
+            {
+                //throw invalid_value_exception(to_string() << "set_pu(id=" << std::to_string(_id) << ") failed!" << " Last Error: " << strerror(errno));
+                std::stringstream ss;
+                ss << "set_pu(id=" << _id << ") failed!" << " Last Error: " << strerror(errno);
+                throw invalid_value_exception(ss.str());
+            }
+
             _record(*this);
         });
 }
@@ -49,7 +55,13 @@ float librealsense::uvc_pu_option::query() const
         {
             int32_t value = 0;
             if (!dev.get_pu(_id, value))
-                throw invalid_value_exception(to_string() << "get_pu(id=" << std::to_string(_id) << ") failed!" << " Last Error: " << strerror(errno));
+            {
+                //throw invalid_value_exception(to_string() << "get_pu(id=" << std::to_string(_id) << ") failed!" << " Last Error: " << strerror(errno));
+                std::stringstream ss;
+                ss << "get_pu(id=" << _id << ") failed!" << " Last Error: " << strerror(errno);
+                throw invalid_value_exception(ss.str());
+            }
+
 
             return static_cast<float>(value);
         }));

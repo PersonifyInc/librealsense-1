@@ -44,7 +44,7 @@ namespace librealsense
             }
         }
 
-        void write_frame(const stream_identifier& stream_id, const nanoseconds& timestamp, frame_holder&& frame) 
+        void write_frame(const stream_identifier& stream_id, const nanoseconds& timestamp, frame_holder&& frame)
         {
             if (Is<video_frame>(frame.frame))
             {
@@ -94,7 +94,11 @@ namespace librealsense
             auto metadata_topic = ros_topic::frame_metadata_topic(stream_id);
             diagnostic_msgs::KeyValue system_time;
             system_time.key = SYSTEM_TIME_MD_STR;
-            system_time.value = std::to_string(frame->get_frame_system_time());
+            //system_time.value = std::to_string(frame->get_frame_system_time());
+            std::stringstream ss;
+            ss << frame->get_frame_system_time();
+            ss >> system_time.value;
+
             write_message(metadata_topic, timestamp, system_time);
 
             diagnostic_msgs::KeyValue timestamp_domain;
@@ -110,7 +114,10 @@ namespace librealsense
                     auto md = frame->get_frame_metadata(type);
                     diagnostic_msgs::KeyValue md_msg;
                     md_msg.key = librealsense::get_string(type);
-                    md_msg.value = std::to_string(md);
+                    //md_msg.value = std::to_string(md);
+                    std::stringstream ss;
+                    ss << md;
+                    ss >> md_msg.value;
                     write_message(metadata_topic, timestamp, md_msg);
                 }
             }
@@ -202,7 +209,7 @@ namespace librealsense
             {
                 throw io_exception("Null frame passed to write_motion_frame");
             }
-            
+
             imu_msg.header.seq = static_cast<uint32_t>(frame.frame->get_frame_number());
             std::chrono::duration<double, std::milli> timestamp_ms(frame.frame->get_frame_timestamp());
             imu_msg.header.stamp = ros::Time(std::chrono::duration<double>(timestamp_ms).count());
@@ -215,12 +222,12 @@ namespace librealsense
                 imu_msg.linear_acceleration.y = data_ptr[1];
                 imu_msg.linear_acceleration.z = data_ptr[2];
             }
-           
+
             else if (stream_id.stream_type == RS2_STREAM_GYRO)
             {
                 imu_msg.angular_velocity.x = data_ptr[0];
                 imu_msg.angular_velocity.y = data_ptr[1];
-                imu_msg.angular_velocity.z = data_ptr[2]; 
+                imu_msg.angular_velocity.z = data_ptr[2];
             }
             else
             {
@@ -282,23 +289,32 @@ namespace librealsense
 
             // Write the pose confidence as metadata for the pose frame
             std::string md_topic = ros_topic::frame_metadata_topic(stream_id);
-            
+
             diagnostic_msgs::KeyValue tracker_confidence_msg;
             tracker_confidence_msg.key = TRACKER_CONFIDENCE_MD_STR;
-            tracker_confidence_msg.value = std::to_string(pose->get_tracker_confidence());
+            //tracker_confidence_msg.value = std::to_string(pose->get_tracker_confidence());
+            std::stringstream ss;
+            ss << pose->get_tracker_confidence();
+            ss >> tracker_confidence_msg.value;
             write_message(md_topic, timestamp, tracker_confidence_msg);
 
             diagnostic_msgs::KeyValue mapper_confidence_msg;
             mapper_confidence_msg.key = MAPPER_CONFIDENCE_MD_STR;
-            mapper_confidence_msg.value = std::to_string(pose->get_mapper_confidence());
+            //mapper_confidence_msg.value = std::to_string(pose->get_mapper_confidence());
+            ss.str("");
+            ss << pose->get_mapper_confidence();
+            ss >> mapper_confidence_msg.value;
             write_message(md_topic, timestamp, mapper_confidence_msg);
 
             //Write frame's timestamp as metadata
             diagnostic_msgs::KeyValue frame_timestamp_msg;
             frame_timestamp_msg.key = FRAME_TIMESTAMP_MD_STR;
-            frame_timestamp_msg.value = to_string() << pose->get_frame_timestamp();
+            //frame_timestamp_msg.value = to_string() << pose->get_frame_timestamp();
+            ss.str("");
+            ss << pose->get_frame_timestamp();
+            ss >> frame_timestamp_msg.value;
             write_message(md_topic, timestamp, frame_timestamp_msg);
-            
+
             // Write the rest of the frame metadata and stream extrinsics
             write_additional_frame_messages(stream_id, timestamp, frame);
         }
@@ -315,7 +331,7 @@ namespace librealsense
         void write_streaming_info(nanoseconds timestamp, const sensor_identifier& sensor_id, std::shared_ptr<video_stream_profile_interface> profile)
         {
             write_stream_info(timestamp, sensor_id, profile);
-            
+
             sensor_msgs::CameraInfo camera_info_msg;
             camera_info_msg.width = profile->get_width();
             camera_info_msg.height = profile->get_height();
@@ -342,7 +358,7 @@ namespace librealsense
             write_stream_info(timestamp, sensor_id, profile);
 
             realsense_msgs::ImuIntrinsic motion_info_msg;
-            
+
             rs2_motion_device_intrinsic intrinsics{};
             try {
                 intrinsics = profile->get_intrinsics();
@@ -457,7 +473,7 @@ namespace librealsense
                 }
             }
         }
-        
+
         void write_sensor_option(device_serializer::sensor_identifier sensor_id, const nanoseconds& timestamp, rs2_option type, const librealsense::option& option)
         {
             float value = option.query();

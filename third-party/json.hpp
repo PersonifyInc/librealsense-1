@@ -3146,7 +3146,10 @@ class basic_json
             catch (std::out_of_range&)
             {
                 // create better exception explanation
-                throw std::out_of_range("array index " + std::to_string(idx) + " is out of range");
+                //throw std::out_of_range("array index " + std::to_string(idx) + " is out of range");
+                std::stringstream ss;
+                ss << "array index " << idx << " is out of range";
+                throw std::out_of_range(ss.str());
             }
         }
         else
@@ -3189,7 +3192,10 @@ class basic_json
             catch (std::out_of_range&)
             {
                 // create better exception explanation
-                throw std::out_of_range("array index " + std::to_string(idx) + " is out of range");
+                //throw std::out_of_range("array index " + std::to_string(idx) + " is out of range");
+                std::stringstream ss;
+                ss << "array index " << idx << " is out of range";
+                throw std::out_of_range(ss.str());
             }
         }
         else
@@ -10974,6 +10980,7 @@ basic_json_parser_66:
             // JSON value j which will be overwritten by a primitive value
             for (const auto& reference_token : reference_tokens)
             {
+                std::stringstream ss;
                 switch (result->m_type)
                 {
                     case value_t::null:
@@ -11001,7 +11008,12 @@ basic_json_parser_66:
                     case value_t::array:
                     {
                         // create an entry in the array
-                        result = &result->operator[](static_cast<size_type>(std::stoi(reference_token)));
+                        //result = &result->operator[](static_cast<size_type>(std::stoi(reference_token)));
+                        ss.str("");
+                        ss << reference_token;
+                        size_type tmp;
+                        ss >> tmp;
+                        result = &result->operator[](tmp);
                         break;
                     }
 
@@ -11126,9 +11138,11 @@ basic_json_parser_66:
                         if (reference_token == "-")
                         {
                             // "-" always fails the range check
-                            throw std::out_of_range("array index '-' (" +
-                                                    std::to_string(ptr->m_value.array->size()) +
-                                                    ") is out of range");
+                            std::stringstream ss;
+                            ss << "array index '-' (" <<
+                                                    ptr->m_value.array->size() <<
+                                                    ") is out of range";
+                            throw std::out_of_range(ss.str());
                         }
 
                         // error condition (cf. RFC 6901, Sect. 4)
@@ -11178,9 +11192,10 @@ basic_json_parser_66:
                         if (reference_token == "-")
                         {
                             // "-" cannot be used for const access
-                            throw std::out_of_range("array index '-' (" +
-                                                    std::to_string(ptr->m_value.array->size()) +
-                                                    ") is out of range");
+                            std::stringstream ss;
+                            ss << "array index '-' (" << ptr->m_value.array->size() <<
+                                                    ") is out of range";
+                            throw std::out_of_range(ss.str());
                         }
 
                         // error condition (cf. RFC 6901, Sect. 4)
@@ -11222,9 +11237,10 @@ basic_json_parser_66:
                         if (reference_token == "-")
                         {
                             // "-" always fails the range check
-                            throw std::out_of_range("array index '-' (" +
-                                                    std::to_string(ptr->m_value.array->size()) +
-                                                    ") is out of range");
+                            std::stringstream ss;
+                            ss << "array index '-' (" << ptr->m_value.array->size()) <<
+                                                    ") is out of range";
+                            throw std::out_of_range(ss.str());
                         }
 
                         // error condition (cf. RFC 6901, Sect. 4)
@@ -11376,10 +11392,14 @@ basic_json_parser_66:
                     }
                     else
                     {
+                        std::stringstream ss;
+
                         // iterate array and use index as reference string
                         for (size_t i = 0; i < value.m_value.array->size(); ++i)
                         {
-                            flatten(reference_string + "/" + std::to_string(i),
+                            ss.str("");
+                            ss << reference_string << "/" << i;
+                            flatten(ss.str(),
                                     value.m_value.array->operator[](i), result);
                         }
                     }
@@ -11739,6 +11759,7 @@ basic_json_parser_66:
                 const auto last_path = ptr.pop_back();
                 basic_json& parent = result[ptr];
 
+                std::stringstream ss;
                 switch (parent.m_type)
                 {
                     case value_t::null:
@@ -11762,7 +11783,9 @@ basic_json_parser_66:
                             if (static_cast<size_type>(idx) > parent.size())
                             {
                                 // avoid undefined behavior
-                                throw std::out_of_range("array index " + std::to_string(idx) + " is out of range");
+                                ss.str("");
+                                ss << "array index " << idx << " is out of range";
+                                throw std::out_of_range(ss.str());
                             }
                             else
                             {
@@ -11998,6 +12021,8 @@ basic_json_parser_66:
         }
         else
         {
+            std::stringstream ss;
+
             switch (source.type())
             {
                 case value_t::array:
@@ -12006,8 +12031,10 @@ basic_json_parser_66:
                     size_t i = 0;
                     while (i < source.size() and i < target.size())
                     {
+                        ss.str("");
+                        ss << path << "/" << i;
                         // recursive call to compare array values at index i
-                        auto temp_diff = diff(source[i], target[i], path + "/" + std::to_string(i));
+                        auto temp_diff = diff(source[i], target[i], ss.str());
                         result.insert(result.end(), temp_diff.begin(), temp_diff.end());
                         ++i;
                     }
@@ -12017,14 +12044,18 @@ basic_json_parser_66:
 
                     // remove my remaining elements
                     const auto end_index = static_cast<difference_type>(result.size());
+                    std::stringstream ss;
+
                     while (i < source.size())
                     {
+                        ss.str("");
+                        ss << path << "/" << i;
                         // add operations in reverse order to avoid invalid
                         // indices
                         result.insert(result.begin() + end_index, object(
                         {
                             {"op", "remove"},
-                            {"path", path + "/" + std::to_string(i)}
+                            {"path", ss.str()}
                         }));
                         ++i;
                     }
@@ -12032,10 +12063,12 @@ basic_json_parser_66:
                     // add other remaining elements
                     while (i < target.size())
                     {
+                        ss.str("");
+                        ss << path << "/" << i;
                         result.push_back(
                         {
                             {"op", "add"},
-                            {"path", path + "/" + std::to_string(i)},
+                            {"path", ss.str()},
                             {"value", target[i]}
                         });
                         ++i;
@@ -12060,11 +12093,13 @@ basic_json_parser_66:
                         }
                         else
                         {
+                            ss.str("");
+                            ss << path  << "/" << key;
                             // found a key that is not in o -> remove it
                             result.push_back(object(
                             {
                                 {"op", "remove"},
-                                {"path", path + "/" + key}
+                                {"path", ss.str()}
                             }));
                         }
                     }
@@ -12074,12 +12109,14 @@ basic_json_parser_66:
                     {
                         if (source.find(it.key()) == source.end())
                         {
+                            ss.str("");
+                            ss << path << "/" << key;
                             // found a key that is not in this -> add it
                             const auto key = json_pointer::escape(it.key());
                             result.push_back(
                             {
                                 {"op", "add"},
-                                {"path", path + "/" + key},
+                                {"path", ss.str()},
                                 {"value", it.value()}
                             });
                         }
@@ -12207,4 +12244,3 @@ inline nlohmann::json::json_pointer operator "" _json_pointer(const char* s, std
 #endif
 
 #endif
-

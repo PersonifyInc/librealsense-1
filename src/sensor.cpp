@@ -867,7 +867,10 @@ namespace librealsense
             return static_cast<rs2_stream>(RS2_STREAM_GPIO);
         }
 
-        LOG_ERROR("custom_gpio " << std::to_string(custom_gpio) << " is incorrect!");
+        //LOG_ERROR("custom_gpio " << std::to_string(custom_gpio) << " is incorrect!");
+        std::stringstream ss;
+        ss << "custom_gpio " << custom_gpio << " is incorrect!";
+        LOG_ERROR(ss.str());
         return RS2_STREAM_ANY;
     }
 

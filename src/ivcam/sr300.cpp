@@ -204,11 +204,13 @@ namespace librealsense
 
         auto pid_hex_str = hexify(color.pid>>8) + hexify(static_cast<uint8_t>(color.pid));
 
+        std::stringstream ss;
+        ss << static_cast<int>(fw_cmd::GLD);
         register_info(RS2_CAMERA_INFO_NAME,             device_name);
         register_info(RS2_CAMERA_INFO_SERIAL_NUMBER,    serial);
         register_info(RS2_CAMERA_INFO_FIRMWARE_VERSION, fw_version);
         register_info(RS2_CAMERA_INFO_PHYSICAL_PORT,         depth.device_path);
-        register_info(RS2_CAMERA_INFO_DEBUG_OP_CODE,    std::to_string(static_cast<int>(fw_cmd::GLD)));
+        register_info(RS2_CAMERA_INFO_DEBUG_OP_CODE,    ss.str());
         register_info(RS2_CAMERA_INFO_PRODUCT_ID,       pid_hex_str);
 
         register_autorange_options();

@@ -98,7 +98,13 @@ namespace librealsense
         {
             T val = static_cast<T>(value);
             if ((_max < val) || (_min > val))
-                throw invalid_value_exception(to_string() << "Given value " << value << "is outside valid range!");
+            {
+                //throw invalid_value_exception(to_string() << "Given value " << value << "is outside valid range!");
+                std::stringstream ss;
+                ss << "Given value " << value << "is outside valid range!";
+                throw invalid_value_exception(ss.str());
+            }
+
             *_value = val;
             _on_set(value);
         }
@@ -198,7 +204,13 @@ namespace librealsense
                 {
                     T t = static_cast<T>(value);
                     if (!dev.set_xu(_xu, _id, reinterpret_cast<uint8_t*>(&t), sizeof(T)))
-                        throw invalid_value_exception(to_string() << "set_xu(id=" << std::to_string(_id) << ") failed!" << " Last Error: " << strerror(errno));
+                    {
+                        //throw invalid_value_exception(to_string() << "set_xu(id=" << std::to_string(_id) << ") failed!" << " Last Error: " << strerror(errno));
+                        std::stringstream ss;
+                        ss << "set_xu(id=" << _id << ") failed!" << " Last Error: " << strerror(errno);
+                        throw invalid_value_exception(ss.str());
+                    }
+
                     _recording_function(*this);
                 });
         }
@@ -210,7 +222,13 @@ namespace librealsense
                 {
                     T t;
                     if (!dev.get_xu(_xu, _id, reinterpret_cast<uint8_t*>(&t), sizeof(T)))
-                        throw invalid_value_exception(to_string() << "get_xu(id=" << std::to_string(_id) << ") failed!" << " Last Error: " << strerror(errno));
+                    {
+                        //throw invalid_value_exception(to_string() << "get_xu(id=" << std::to_string(_id) << ") failed!" << " Last Error: " << strerror(errno));
+                        std::stringstream ss;
+                        ss << "get_xu(id=" << _id << ") failed!" << " Last Error: " << strerror(errno);
+                        throw invalid_value_exception(ss.str());
+                    }
+
 
                     return static_cast<float>(t);
                 }));
