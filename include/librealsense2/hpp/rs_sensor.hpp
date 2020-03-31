@@ -4,6 +4,9 @@
 #ifndef LIBREALSENSE_RS2_SENSOR_HPP
 #define LIBREALSENSE_RS2_SENSOR_HPP
 
+#include <future>
+#include <chrono>
+#include <thread>
 #include "rs_types.hpp"
 #include "rs_frame.hpp"
 
@@ -191,9 +194,27 @@ namespace rs2
         {
             rs2_error* e = nullptr;
             rs2_set_option(_options, option, value, &e);
+            _options;
             error::handle(e);
         }
 
+        bool set_option_async(rs2_option option, float value) const
+        {
+            std::future<int> setOption = std::async(std::launch::async, [this](rs2_device * ref, rs2_option option, double value)
+            {
+                rs2_error * e = nullptr;
+                rs2_set_option(_options, option, value, &e);
+                error::handle(e);
+                return 1;
+            }, (rs2_device *)this, (rs2_option)option, value);
+
+            if (std::future_status::ready == setOption.wait_for(std::chrono::seconds(1))){
+                return true;
+            }else{
+                throw std::runtime_error("Could not set options");
+                return false;
+            }
+        }
         /**
         * check if particular option is read-only
         * \param[in] option     option id to be checked
